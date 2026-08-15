@@ -25,6 +25,21 @@ function isDisallowedBrowserOrigin(request: Request) {
   return Boolean(configuredOrigin && requestOrigin && requestOrigin !== configuredOrigin);
 }
 
+async function timingSafeEqual(left: string, right: string) {
+  const encoder = new TextEncoder();
+  const leftDigest = new Uint8Array(await crypto.subtle.digest('SHA-256', encoder.encode(left)));
+  const rightDigest = new Uint8Array(await crypto.subtle.digest('SHA-256', encoder.encode(right)));
+
+  let mismatch = leftDigest.length === rightDigest.length ? 0 : 1;
+  const comparisonLength = Math.max(leftDigest.length, rightDigest.length);
+
+  for (let index = 0; index < comparisonLength; index += 1) {
+    mismatch |= (leftDigest[index] ?? 0) ^ (rightDigest[index] ?? 0);
+  }
+
+  return mismatch === 0;
+}
+
 async function isAdminUser(supabaseUrl: string, serviceRoleKey: string, token: string) {
   const adminClient = createClient(supabaseUrl, serviceRoleKey);
   const { data: authData } = await adminClient.auth.getUser(token);
@@ -71,7 +86,11 @@ Deno.serve(async (request) => {
       });
     }
 
-    const cronAuthorized = cronSecret && requestCronSecret && cronSecret === requestCronSecret;
+    const cronAuthorized = Boolean(
+      cronSecret &&
+      requestCronSecret &&
+      await timingSafeEqual(cronSecret, requestCronSecret)
+    );
     const adminAuthorized = authorization && await isAdminUser(supabaseUrl, serviceRoleKey, authorization);
 
     if (!cronAuthorized && !adminAuthorized) {
