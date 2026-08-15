@@ -41,6 +41,7 @@ Additional rules enforced in SQL:
 
 1. Create a Supabase project.
 2. Run `supabase/migrations/001_init_schema.sql`.
+3. Run `supabase/migrations/002_add_withdrawal_wallet_fields.sql`.
 3. Deploy edge functions:
    - `supabase/functions/process-payouts.ts`
    - `supabase/functions/process-withdrawal.ts`
@@ -84,6 +85,7 @@ The client dashboard listener sends the reward to Supabase and updates wallet an
 
 - `supabase-config.js` - session-only Supabase client bootstrap using the publishable anon key
 - `supabase/migrations/001_init_schema.sql` - schema, indexes, RLS, package rules, and payout logic
+- `supabase/migrations/002_add_withdrawal_wallet_fields.sql` - adds `wallet_address` and `network_type` (TRC20/ERC20) to withdrawals
 - `supabase/functions/process-payouts.ts` - secure payout processor for cron or admin trigger
 - `supabase/functions/process-withdrawal.ts` - secure withdrawal request/review handler
 - `js/supabase-auth.js` - Supabase auth and PIN orchestration

@@ -18,7 +18,7 @@ set search_path = public
 as $$
 declare
   v_user_id uuid;
-  v_wallet_balance numeric;
+  v_balance_after numeric;
   v_gross_amount numeric;
   v_fee_amount numeric;
   v_net_amount numeric;
@@ -38,30 +38,21 @@ begin
     raise exception 'Network type must be trc20 or erc20';
   end if;
 
-  select wallet_balance
-  into v_wallet_balance
-  from public.users
-  where id = v_user_id
-  for update;
-
-  if v_wallet_balance is null then
-    raise exception 'User account not found';
-  end if;
-
   v_gross_amount := round(p_amount, 2);
-
-  if v_wallet_balance < v_gross_amount then
-    raise exception 'Insufficient wallet balance for this withdrawal request';
-  end if;
-
   v_fee_amount  := round(v_gross_amount * 0.10, 2);
   v_net_amount  := round(v_gross_amount - v_fee_amount, 2);
 
-  -- Reserve the gross amount immediately so the balance cannot be double-spent.
+  -- Reserve the gross amount and capture the post-deduction balance for the snapshot.
   update public.users
   set wallet_balance = wallet_balance - v_gross_amount,
       updated_at     = timezone('utc', now())
-  where id = v_user_id;
+  where id = v_user_id
+    and wallet_balance >= v_gross_amount
+  returning wallet_balance into v_balance_after;
+
+  if v_balance_after is null then
+    raise exception 'Insufficient wallet balance for this withdrawal request';
+  end if;
 
   insert into public.withdrawals (
     user_id,
@@ -78,7 +69,7 @@ begin
     v_gross_amount,
     v_fee_amount,
     v_net_amount,
-    v_wallet_balance,
+    v_balance_after,
     p_wallet_address,
     p_network_type,
     'pending'
@@ -98,7 +89,7 @@ begin
     v_user_id,
     'withdrawal_request',
     -v_gross_amount,
-    v_wallet_balance - v_gross_amount,
+    v_balance_after,
     'withdrawals',
     v_withdrawal.id,
     'Withdrawal request submitted'
@@ -107,3 +98,5 @@ begin
   return v_withdrawal;
 end;
 $$;
+
+grant execute on function public.create_withdrawal_request(numeric, text, text) to authenticated;

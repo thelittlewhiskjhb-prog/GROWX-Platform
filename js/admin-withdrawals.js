@@ -9,6 +9,7 @@ function buildDetailModal(entry) {
   const networkLabel = entry.network_type ? entry.network_type.toUpperCase() : '—';
   const walletAddress = entry.wallet_address || '—';
   const canApprove = entry.status === 'pending';
+  const canReject = entry.status === 'pending' || entry.status === 'approved';
   const canMarkDone = entry.status === 'approved';
 
   return `
@@ -40,7 +41,7 @@ function buildDetailModal(entry) {
         </dl>
         <div class="button-row">
           <button class="secondary-button" data-modal-approve="${entry.id}" ${canApprove ? '' : 'disabled'}>Approve</button>
-          <button class="danger-button" data-modal-reject="${entry.id}" ${canApprove ? '' : 'disabled'}>Reject</button>
+          <button class="danger-button" data-modal-reject="${entry.id}" ${canReject ? '' : 'disabled'}>Reject</button>
           <button class="primary-button" data-modal-done="${entry.id}" ${canMarkDone ? '' : 'disabled'}>Done</button>
         </div>
       </article>
@@ -71,6 +72,7 @@ export function renderAdminWithdrawals(container, withdrawals, handlers) {
           <tbody>
             ${withdrawals.length ? withdrawals.map((entry) => {
               const canApprove = entry.status === 'pending';
+              const canReject = entry.status === 'pending' || entry.status === 'approved';
               const canMarkDone = entry.status === 'approved';
               return `
                 <tr>
@@ -88,7 +90,7 @@ export function renderAdminWithdrawals(container, withdrawals, handlers) {
                   <td>
                     <div class="button-row">
                       <button class="secondary-button" data-approve="${entry.id}" ${canApprove ? '' : 'disabled'}>Approve</button>
-                      <button class="danger-button" data-reject="${entry.id}" ${canApprove ? '' : 'disabled'}>Reject</button>
+                      <button class="danger-button" data-reject="${entry.id}" ${canReject ? '' : 'disabled'}>Reject</button>
                       <button class="primary-button" data-done="${entry.id}" ${canMarkDone ? '' : 'disabled'}>Done</button>
                     </div>
                   </td>
