@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="growx-supabase-url" content="" />
+    <meta name="growx-supabase-anon-key" content="" />
+    <title>GROWX Admin Dashboard</title>
+    <link rel="stylesheet" href="./css/styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  </head>
+  <body>
+    <main class="page-shell">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">GROWX Platform</p>
+          <h1>Admin dashboard</h1>
+          <p>Real-time management for users, packages, withdrawals, fees, and payout processing.</p>
+        </div>
+        <div class="button-row">
+          <button id="process-payouts-button" class="secondary-button" type="button">Process due payouts</button>
+          <button id="admin-logout-button" class="ghost-button" type="button">Sign out</button>
+        </div>
+      </header>
+
+      <p id="admin-status" class="status-message" aria-live="polite"></p>
+
+      <section id="admin-auth-shell">
+        <article class="card stack gap-sm narrow-card">
+          <h2>Admin sign in</h2>
+          <form id="admin-login-form" class="stack gap-sm">
+            <label><span>Email or phone</span><input name="identifier" type="text" required /></label>
+            <label><span>Password</span><input name="password" type="password" required /></label>
+            <button type="submit" class="primary-button">Access admin dashboard</button>
+          </form>
+        </article>
+      </section>
+
+      <section id="admin-dashboard-shell" hidden class="stack gap-lg">
+        <section id="admin-metrics"></section>
+        <section id="admin-users-root"></section>
+        <section id="admin-packages-root"></section>
+        <section id="admin-withdrawals-root"></section>
+      </section>
+    </main>
+
+    <script type="module" src="./js/admin-dashboard.js"></script>
+  </body>
+</html>
