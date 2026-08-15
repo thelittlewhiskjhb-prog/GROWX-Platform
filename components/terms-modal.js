@@ -21,25 +21,44 @@ export class TermsModal extends HTMLElement {
   render() {
     const label = this.getAttribute('label') || 'View terms';
     const title = this.getAttribute('title') || 'GROWX terms and clauses';
+    const trigger = document.createElement('button');
+    trigger.type = 'button';
+    trigger.className = 'secondary-button terms-trigger';
+    trigger.textContent = label;
 
-    this.innerHTML = `
-      <button type="button" class="secondary-button terms-trigger">${label}</button>
-      <dialog class="terms-dialog">
-        <div class="terms-card">
-          <div class="section-header">
-            <h3>${title}</h3>
-            <button type="button" class="ghost-button close-terms">Close</button>
-          </div>
-          <ul class="terms-list">
-            ${GROWX_TERMS.map((term) => `<li>${term}</li>`).join('')}
-          </ul>
-        </div>
-      </dialog>
-    `;
+    const dialog = document.createElement('dialog');
+    dialog.className = 'terms-dialog';
 
-    const dialog = this.querySelector('dialog');
-    this.querySelector('.terms-trigger')?.addEventListener('click', () => dialog?.showModal());
-    this.querySelector('.close-terms')?.addEventListener('click', () => dialog?.close());
+    const card = document.createElement('div');
+    card.className = 'terms-card';
+
+    const header = document.createElement('div');
+    header.className = 'section-header';
+
+    const heading = document.createElement('h3');
+    heading.textContent = title;
+
+    const closeButton = document.createElement('button');
+    closeButton.type = 'button';
+    closeButton.className = 'ghost-button close-terms';
+    closeButton.textContent = 'Close';
+
+    const list = document.createElement('ul');
+    list.className = 'terms-list';
+
+    GROWX_TERMS.forEach((term) => {
+      const item = document.createElement('li');
+      item.textContent = term;
+      list.append(item);
+    });
+
+    header.append(heading, closeButton);
+    card.append(header, list);
+    dialog.append(card);
+    this.replaceChildren(trigger, dialog);
+
+    trigger.addEventListener('click', () => dialog.showModal());
+    closeButton.addEventListener('click', () => dialog.close());
   }
 }
 
