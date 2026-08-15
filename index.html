@@ -81,6 +81,23 @@
           <article class="card"><p>Next payout</p><p id="next-payout" class="metric-value small">No pending payout</p></article>
         </div>
 
+        <section id="recharge-root">
+          <div class="card stack gap-sm">
+            <h2>Recharge — USDT deposit addresses</h2>
+            <p class="muted-text">Send USDT to one of the addresses below, then notify support with your transaction hash.</p>
+            <div class="address-row">
+              <span class="address-label">ERC20 (Ethereum)</span>
+              <span class="address-value" id="erc20-address">0xe5f65dd88d16ea1ff9a9682d6ed8e10993c3c9a0</span>
+              <button type="button" class="copy-button secondary-button" data-copy-target="erc20-address" aria-label="Copy ERC20 address">Copy</button>
+            </div>
+            <div class="address-row">
+              <span class="address-label">TRC20 (Tron)</span>
+              <span class="address-value" id="trc20-address">TRmdXgVDBfC7z54fD3gHS2zXHd2E77CjXV</span>
+              <button type="button" class="copy-button secondary-button" data-copy-target="trc20-address" aria-label="Copy TRC20 address">Copy</button>
+            </div>
+          </div>
+        </section>
+
         <section id="cycle-root"></section>
         <section id="packages-root"></section>
         <section id="withdrawals-root"></section>

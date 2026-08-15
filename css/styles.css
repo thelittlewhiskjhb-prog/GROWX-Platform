@@ -392,3 +392,45 @@ fieldset.stack legend {
   font-size: 0.85rem;
   color: var(--muted);
 }
+
+.muted-text {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.address-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.85rem;
+  background: rgba(8, 17, 36, 0.8);
+}
+
+.address-label {
+  color: var(--muted);
+  font-size: 0.85rem;
+  min-width: 7rem;
+  flex-shrink: 0;
+}
+
+.address-value {
+  flex: 1;
+  font-family: monospace;
+  font-size: 0.88rem;
+  word-break: break-all;
+}
+
+.copy-button {
+  flex-shrink: 0;
+  padding: 0.45rem 0.85rem;
+  font-size: 0.82rem;
+}
+
+.copy-button.copied {
+  color: var(--accent);
+  border-color: var(--accent);
+}

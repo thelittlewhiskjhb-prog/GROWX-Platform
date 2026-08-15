@@ -310,3 +310,24 @@ elements.pinLogin?.addEventListener('pin-submit', handlePin);
 elements.logoutButton?.addEventListener('click', handleLogout);
 
 resolveShell().catch((error) => setStatus(error.message, 'danger'));
+
+document.querySelectorAll('.copy-button[data-copy-target]').forEach((button) => {
+  button.addEventListener('click', async () => {
+    const targetId = button.dataset.copyTarget;
+    const text = document.getElementById(targetId)?.textContent?.trim();
+    if (!text) return;
+
+    try {
+      await navigator.clipboard.writeText(text);
+      button.textContent = 'Copied!';
+      button.classList.add('copied');
+      setTimeout(() => {
+        button.textContent = 'Copy';
+        button.classList.remove('copied');
+      }, 2000);
+    } catch {
+      button.textContent = 'Failed';
+      setTimeout(() => { button.textContent = 'Copy'; }, 2000);
+    }
+  });
+});
