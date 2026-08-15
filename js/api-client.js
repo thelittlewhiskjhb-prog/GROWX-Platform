@@ -121,13 +121,10 @@ export const apiClient = {
 
   async requestWithdrawal(amount, walletAddress, networkType) {
     return unwrap(
-      getClient().functions.invoke('process-withdrawal', {
-        body: {
-          action: 'request',
-          amount: Number(amount),
-          walletAddress: walletAddress || null,
-          networkType: networkType || null
-        }
+      getClient().rpc('request_withdrawal', {
+        p_amount: Number(amount),
+        p_wallet: (walletAddress || '').trim(),
+        p_network: networkType || ''
       })
     );
   },

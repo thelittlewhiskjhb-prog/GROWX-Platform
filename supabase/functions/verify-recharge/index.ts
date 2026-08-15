@@ -95,11 +95,10 @@ Deno.serve(async (req) => {
 
     // action === 'verify' — credit the wallet atomically
     // Use a DB transaction via RPC to ensure balance + ledger are consistent
-    const { error: creditError } = await serviceClient.rpc('admin_credit_wallet_service', {
+    const { error: creditError } = await serviceClient.rpc('admin_credit_wallet', {
       p_user_id: recharge.user_id,
       p_amount: recharge.amount,
-      p_description: `Recharge verified — ${recharge.network.toUpperCase()} ${recharge.amount} USDT`,
-      p_admin_id: user.id
+      p_description: `Recharge verified — ${recharge.network.toUpperCase()} ${recharge.amount} USDT`
     });
 
     if (creditError) {

@@ -51,71 +51,24 @@ Deno.serve(async (req) => {
 
       const { amount, walletAddress, networkType } = body;
 
-      const parsedAmount = Number(amount);
-      if (!parsedAmount || parsedAmount <= 0) {
-        return jsonResponse({ error: 'Invalid amount' }, 400);
-      }
-
-      if (!['trc20', 'erc20'].includes(networkType)) {
-        return jsonResponse({ error: 'Invalid network. Choose trc20 or erc20.' }, 400);
-      }
-
-      if (!walletAddress || walletAddress.trim().length < 10) {
-        return jsonResponse({ error: 'Invalid wallet address' }, 400);
-      }
-
-      // Validate address format
-      const trimmedAddress = walletAddress.trim();
-      if (networkType === 'trc20' && !/^T[a-zA-Z0-9]{33}$/.test(trimmedAddress)) {
-        return jsonResponse({ error: 'Invalid TRC20 address format (must start with T, 34 characters)' }, 400);
-      }
-      if (networkType === 'erc20' && !/^0x[a-fA-F0-9]{40}$/.test(trimmedAddress)) {
-        return jsonResponse({ error: 'Invalid ERC20 address format (must start with 0x, 42 characters)' }, 400);
-      }
-
-      // Server-side balance check
-      if ((profile?.wallet_balance ?? 0) < parsedAmount) {
-        return jsonResponse({ error: 'Insufficient wallet balance' }, 400);
-      }
-
-      const feeAmount  = Number((parsedAmount * 0.1).toFixed(2));
-      const netAmount  = Number((parsedAmount - feeAmount).toFixed(2));
-
-      const { data: withdrawal, error: wError } = await serviceClient
-        .from('withdrawals')
-        .insert({
-          user_id: user.id,
-          gross_amount: parsedAmount,
-          fee_amount: feeAmount,
-          net_amount: netAmount,
-          network: networkType,
-          wallet_address: trimmedAddress,
-          status: 'processing'
-        })
-        .select()
-        .single();
-
-      if (wError) {
-        console.error('withdrawal insert error:', wError);
-        return jsonResponse({ error: 'Unable to submit withdrawal' }, 500);
-      }
-
-      // Reserve the amount (debit wallet balance) so client cannot double-withdraw
-      await serviceClient
-        .from('users')
-        .update({ wallet_balance: (profile.wallet_balance - parsedAmount), updated_at: new Date().toISOString() })
-        .eq('id', user.id);
-
-      await serviceClient.from('transactions').insert({
-        user_id: user.id,
-        transaction_type: 'withdrawal_request',
-        amount: -parsedAmount,
-        description: `Withdrawal request — ${networkType.toUpperCase()} ${parsedAmount} USDT`,
-        reference_id: withdrawal.id,
-        reference_type: 'withdrawals'
+      // Delegate to the atomic RPC — validation, balance deduction, and
+      // ledger entry all happen in a single database transaction.
+      const authUserClient = createClient(supabaseUrl, anonKey, {
+        auth: { persistSession: false },
+        global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } }
       });
 
-      return jsonResponse({ success: true, withdrawal });
+      const { data: withdrawalId, error: rpcError } = await authUserClient.rpc('request_withdrawal', {
+        p_amount:  Number(amount),
+        p_wallet:  (walletAddress || '').trim(),
+        p_network: networkType || ''
+      });
+
+      if (rpcError) {
+        return jsonResponse({ error: rpcError.message }, 400);
+      }
+
+      return jsonResponse({ success: true, withdrawalId });
     }
 
     // ─── ADMIN: Review (approve / reject / complete) ─────────

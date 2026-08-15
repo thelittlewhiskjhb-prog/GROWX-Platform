@@ -84,7 +84,7 @@ export function renderWithdrawalManager({ container, profile, withdrawals, setSt
                   <td>${formatCurrency(item.gross_amount)}</td>
                   <td>${formatCurrency(item.fee_amount)}</td>
                   <td>${formatCurrency(item.net_amount)}</td>
-                  <td>${item.status === 'paid' ? 'Completed' : item.status}</td>
+                  <td>${item.status === 'completed' ? 'Completed' : item.status}</td>
                 </tr>
               `).join('') : '<tr><td colspan="5">No withdrawals submitted yet.</td></tr>'}
             </tbody>

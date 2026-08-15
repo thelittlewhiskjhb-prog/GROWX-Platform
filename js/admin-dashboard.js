@@ -9,6 +9,7 @@ const state = {
   unsubscribe: null,
   metrics: null,
   users: [],
+  packages: [],
   userPackages: [],
   withdrawals: [],
   recharges: []
@@ -53,12 +54,13 @@ async function refreshAdminDashboard() {
     throw new Error('This account does not have admin access.');
   }
 
-  [state.metrics, state.users, state.userPackages, state.withdrawals, state.recharges] = await Promise.all([
+  [state.metrics, state.users, state.userPackages, state.withdrawals, state.recharges, state.packages] = await Promise.all([
     apiClient.fetchAdminMetrics(),
     apiClient.fetchAdminUsers(),
     apiClient.fetchAdminPackages(),
     apiClient.fetchAdminWithdrawals(),
-    apiClient.fetchAdminRecharges()
+    apiClient.fetchAdminRecharges(),
+    apiClient.listPackages()
   ]);
 
   renderMetrics(state.metrics);
