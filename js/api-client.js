@@ -45,7 +45,13 @@ export const apiClient = {
         .order('purchased_at', { ascending: false })
     );
   },
-
+  async purchasePackage(packageId) {
+    return unwrap(
+      getClient().rpc('purchase_package', {
+        p_package_id: packageId
+      })
+    );
+  },
   async fetchWithdrawals() {
     return unwrap(
       getClient()
