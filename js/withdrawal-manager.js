@@ -42,6 +42,19 @@ export function renderWithdrawalManager({ container, profile, withdrawals, setSt
             <span>Withdrawal amount (USD)</span>
             <input id="withdrawal-amount" type="number" min="1" step="0.01" required />
           </label>
+          <label>
+            <span>Wallet address</span>
+            <input id="withdrawal-wallet-address" type="text" placeholder="Paste your wallet address" required />
+          </label>
+          <fieldset class="stack gap-xs">
+            <legend>Network</legend>
+            <label class="inline-radio">
+              <input type="radio" name="network_type" value="trc20" required /> TRC20 (TRON)
+            </label>
+            <label class="inline-radio">
+              <input type="radio" name="network_type" value="erc20" /> ERC20 (Ethereum)
+            </label>
+          </fieldset>
           <div class="terms-inline subtle">
             <ul>
               ${GROWX_TERMS.slice(0, 1).concat(GROWX_TERMS.slice(5)).map((term) => `<li>${term}</li>`).join('')}
@@ -71,7 +84,7 @@ export function renderWithdrawalManager({ container, profile, withdrawals, setSt
                   <td>${formatCurrency(item.gross_amount)}</td>
                   <td>${formatCurrency(item.fee_amount)}</td>
                   <td>${formatCurrency(item.net_amount)}</td>
-                  <td>${item.status}</td>
+                  <td>${item.status === 'paid' ? 'Completed' : item.status}</td>
                 </tr>
               `).join('') : '<tr><td colspan="5">No withdrawals submitted yet.</td></tr>'}
             </tbody>
@@ -83,6 +96,7 @@ export function renderWithdrawalManager({ container, profile, withdrawals, setSt
 
   const form = container.querySelector('#withdrawal-form');
   const amountInput = container.querySelector('#withdrawal-amount');
+  const walletAddressInput = container.querySelector('#withdrawal-wallet-address');
   const preview = container.querySelector('#withdrawal-preview');
 
   const updatePreview = () => {
@@ -98,16 +112,28 @@ export function renderWithdrawalManager({ container, profile, withdrawals, setSt
   form?.addEventListener('submit', async (event) => {
     event.preventDefault();
     const amount = Number(amountInput?.value || 0);
+    const walletAddress = walletAddressInput?.value.trim();
+    const networkType = form.querySelector('input[name="network_type"]:checked')?.value;
 
     if (amount <= 0) {
       setStatus('Enter a valid withdrawal amount.', 'warning');
       return;
     }
 
+    if (!walletAddress) {
+      setStatus('Enter your wallet address.', 'warning');
+      return;
+    }
+
+    if (!networkType) {
+      setStatus('Select a network type (TRC20 or ERC20).', 'warning');
+      return;
+    }
+
     setStatus('Submitting withdrawal request…');
 
     try {
-      await apiClient.requestWithdrawal(amount);
+      await apiClient.requestWithdrawal(amount, walletAddress, networkType);
       form.reset();
       updatePreview();
       setStatus('Withdrawal submitted successfully.', 'success');

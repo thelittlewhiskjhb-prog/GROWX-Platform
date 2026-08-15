@@ -98,11 +98,13 @@ export const apiClient = {
     return unwrap(getClient().rpc('admin_dashboard_metrics'));
   },
 
-  async requestWithdrawal(amount) {
+  async requestWithdrawal(amount, walletAddress, networkType) {
     return unwrap(getClient().functions.invoke('process-withdrawal', {
       body: {
         action: 'request',
-        amount: Number(amount)
+        amount: Number(amount),
+        walletAddress: walletAddress || null,
+        networkType: networkType || null
       }
     }));
   },

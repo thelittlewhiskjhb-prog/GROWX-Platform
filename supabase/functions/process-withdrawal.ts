@@ -71,7 +71,9 @@ Deno.serve(async (request) => {
 
     if (body.action === 'request') {
       const { data, error } = await client.rpc('create_withdrawal_request', {
-        p_amount: Number(body.amount)
+        p_amount: Number(body.amount),
+        p_wallet_address: body.walletAddress ?? null,
+        p_network_type: body.networkType ?? null
       });
 
       if (error) throw error;
