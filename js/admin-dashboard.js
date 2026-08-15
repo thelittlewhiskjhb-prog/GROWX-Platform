@@ -73,6 +73,7 @@ function startRealtimeSync() {
 }
 
 async function resolveAdminShell() {
+  state.unsubscribe?.();
   const session = await supabaseAuth.getSession().catch(() => null);
   if (!session) {
     elements.authShell.hidden = false;
@@ -80,9 +81,9 @@ async function resolveAdminShell() {
     return;
   }
 
+  await refreshAdminDashboard();
   elements.authShell.hidden = true;
   elements.dashboardShell.hidden = false;
-  await refreshAdminDashboard();
   startRealtimeSync();
 }
 

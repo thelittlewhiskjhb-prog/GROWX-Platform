@@ -139,6 +139,7 @@ async function resolveShell() {
   state.user = await supabaseAuth.getUser().catch(() => null);
 
   if (!state.session || !state.user) {
+    elements.profileSetupCard.hidden = true;
     toggleShell('auth');
     return;
   }
