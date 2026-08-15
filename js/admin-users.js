@@ -5,10 +5,15 @@ function formatCurrency(value) {
   }).format(Number(value || 0));
 }
 
-function buildUserModal(user, handlers) {
+function buildUserModal(user, packages) {
   const isActive = user.status === 'active';
   const toggleLabel = isActive ? 'Suspend account' : 'Activate account';
   const toggleClass = isActive ? 'danger-button' : 'secondary-button';
+
+  const packageOptions = (packages || [])
+    .filter((p) => p.active)
+    .map((p) => `<option value="${p.id}">${p.name} — ${formatCurrency(p.amount)}</option>`)
+    .join('');
 
   return `
     <div class="modal-backdrop" id="user-modal">
@@ -19,6 +24,7 @@ function buildUserModal(user, handlers) {
         </header>
         <dl class="detail-list">
           <dt>Name</dt><dd>${user.full_name || '—'}</dd>
+          <dt>Client code</dt><dd>${user.client_code || '—'}</dd>
           <dt>Phone</dt><dd>${user.phone || '—'}</dd>
           <dt>Email</dt><dd>${user.email || '—'}</dd>
           <dt>Role</dt><dd>${user.role}</dd>
@@ -41,9 +47,28 @@ function buildUserModal(user, handlers) {
 
         <hr />
 
+        ${packageOptions ? `
+        <section class="stack gap-sm">
+          <h4>Allocate package</h4>
+          <form id="allocate-package-form" class="stack gap-sm">
+            <label>
+              <span>Package</span>
+              <select name="packageId" required>
+                <option value="">— Select package —</option>
+                ${packageOptions}
+              </select>
+            </label>
+            <button type="submit" class="secondary-button">Allocate package</button>
+          </form>
+        </section>
+        <hr />
+        ` : ''}
+
         <div class="button-row">
-          <button class="${toggleClass}" id="user-toggle-status" type="button" data-user-id="${user.id}" data-current-status="${user.status}">${toggleLabel}</button>
-          ${user.email ? `<button class="ghost-button" id="user-reset-password" type="button" data-email="${user.email}">Send password reset</button>` : '<span class="muted-text">No email — password reset unavailable</span>'}
+          <button class="${toggleClass}" id="user-toggle-status" type="button">${toggleLabel}</button>
+          ${user.email
+            ? `<button class="ghost-button" id="user-reset-password" type="button" data-email="${user.email}">Send password reset</button>`
+            : '<span class="muted-text">No email — password reset unavailable</span>'}
         </div>
       </article>
     </div>
@@ -66,6 +91,7 @@ export function renderAdminUsers(container, users, handlers) {
           <thead>
             <tr>
               <th>Name</th>
+              <th>Code</th>
               <th>Phone</th>
               <th>Role</th>
               <th>Status</th>
@@ -78,16 +104,17 @@ export function renderAdminUsers(container, users, handlers) {
             ${users.length ? users.map((user) => `
               <tr>
                 <td>${user.full_name || '—'}</td>
+                <td>${user.client_code || '—'}</td>
                 <td>${user.phone || '—'}</td>
                 <td>${user.role}</td>
-                <td>${user.status}</td>
+                <td><span class="badge ${user.status}">${user.status}</span></td>
                 <td>${formatCurrency(user.wallet_balance)}</td>
                 <td>${formatCurrency(user.reward_balance)}</td>
                 <td>
                   <button class="secondary-button user-manage-btn" data-user-id="${user.id}" type="button">Manage</button>
                 </td>
               </tr>
-            `).join('') : '<tr><td colspan="7">No users found.</td></tr>'}
+            `).join('') : '<tr><td colspan="8">No users found.</td></tr>'}
           </tbody>
         </table>
       </div>
@@ -96,11 +123,12 @@ export function renderAdminUsers(container, users, handlers) {
   `;
 
   const modalRoot = container.querySelector('#user-modal-root');
+  const packages = handlers?.packages || [];
 
   function openUserModal(userId) {
     const user = users.find((u) => u.id === userId);
     if (!user || !modalRoot) return;
-    modalRoot.innerHTML = buildUserModal(user, handlers);
+    modalRoot.innerHTML = buildUserModal(user, packages);
 
     modalRoot.querySelector('#user-modal-close')?.addEventListener('click', () => {
       modalRoot.innerHTML = '';
@@ -123,17 +151,24 @@ export function renderAdminUsers(container, users, handlers) {
       await handlers.onTransferFunds({ userId: user.id, amount, description });
     });
 
+    modalRoot.querySelector('#allocate-package-form')?.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const formData = new FormData(event.currentTarget);
+      const packageId = formData.get('packageId');
+      if (!packageId) return;
+      modalRoot.innerHTML = '';
+      await handlers.onAllocatePackage({ clientUserId: user.id, packageId });
+    });
+
     modalRoot.querySelector('#user-toggle-status')?.addEventListener('click', async () => {
-      const isActive = user.status === 'active';
-      const newStatus = isActive ? 'suspended' : 'active';
+      const newStatus = user.status === 'active' ? 'suspended' : 'active';
       modalRoot.innerHTML = '';
       await handlers.onToggleStatus({ userId: user.id, newStatus });
     });
 
     modalRoot.querySelector('#user-reset-password')?.addEventListener('click', async () => {
-      const email = user.email;
       modalRoot.innerHTML = '';
-      await handlers.onResetPassword(email);
+      await handlers.onResetPassword(user.email);
     });
   }
 

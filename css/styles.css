@@ -448,3 +448,22 @@ fieldset.stack legend {
   padding: 0.4rem 0.75rem;
   font-size: 0.82rem;
 }
+
+/* Warning box for network warning */
+.warning-box {
+  padding: 0.75rem 1rem;
+  border: 1px solid rgba(255, 182, 72, 0.4);
+  border-radius: 0.85rem;
+  background: rgba(255, 182, 72, 0.08);
+  color: var(--warning);
+  font-size: 0.88rem;
+}
+
+/* Status badge variants */
+.badge.pending    { background: rgba(255, 182, 72, 0.18); color: var(--warning); }
+.badge.verified   { background: rgba(73, 211, 139, 0.18); color: var(--accent); }
+.badge.rejected   { background: rgba(255, 107, 107, 0.18); color: var(--danger); }
+.badge.processing { background: rgba(159, 176, 200, 0.2); }
+.badge.approved   { background: rgba(73, 211, 139, 0.18); color: var(--accent); }
+.badge.completed  { background: rgba(159, 176, 200, 0.2); }
+.badge.suspended  { background: rgba(255, 107, 107, 0.18); color: var(--danger); }

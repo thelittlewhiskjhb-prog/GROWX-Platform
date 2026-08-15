@@ -32,11 +32,9 @@ export const apiClient = {
   },
 
   async listPackages() {
-    return unwrap(getClient().from('packages').select('*').eq('active', true).order('amount', { ascending: true }));
-  },
-
-  async purchasePackage(packageId) {
-    return unwrap(getClient().rpc('purchase_package', { p_package_id: packageId }));
+    return unwrap(
+      getClient().from('packages').select('*').eq('active', true).order('amount', { ascending: true })
+    );
   },
 
   async fetchClientPackages() {
@@ -67,6 +65,75 @@ export const apiClient = {
     );
   },
 
+  // ── Recharge ─────────────────────────────────────────────
+
+  async fetchDepositAddresses() {
+    return unwrap(
+      getClient()
+        .from('deposit_addresses')
+        .select('network, address')
+        .eq('active', true)
+    );
+  },
+
+  async createRechargeRequest({ amount, network }) {
+    return unwrap(
+      getClient().rpc('create_recharge_request', {
+        p_amount: Number(amount),
+        p_network: network
+      })
+    );
+  },
+
+  async fetchRechargeRequests() {
+    return unwrap(
+      getClient()
+        .from('recharge_requests')
+        .select('*')
+        .order('created_at', { ascending: false })
+    );
+  },
+
+  // ── Daily reward ─────────────────────────────────────────
+
+  async claimDailyReward() {
+    return unwrap(getClient().rpc('claim_daily_reward'));
+  },
+
+  async fetchLastRewardClaim() {
+    return unwrap(
+      getClient()
+        .from('reward_claims')
+        .select('claimed_at, amount')
+        .order('claimed_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+    );
+  },
+
+  // ── Gift codes ────────────────────────────────────────────
+
+  async redeemGiftCode(code) {
+    return unwrap(getClient().rpc('redeem_gift_code', { p_code: code }));
+  },
+
+  // ── Withdrawals ───────────────────────────────────────────
+
+  async requestWithdrawal(amount, walletAddress, networkType) {
+    return unwrap(
+      getClient().functions.invoke('process-withdrawal', {
+        body: {
+          action: 'request',
+          amount: Number(amount),
+          walletAddress: walletAddress || null,
+          networkType: networkType || null
+        }
+      })
+    );
+  },
+
+  // ── Admin ─────────────────────────────────────────────────
+
   async fetchAdminUsers() {
     return unwrap(
       getClient()
@@ -89,8 +156,17 @@ export const apiClient = {
     return unwrap(
       getClient()
         .from('withdrawals')
-        .select('*, users(full_name, phone)')
+        .select('*, users(full_name, phone, client_code)')
         .order('requested_at', { ascending: false })
+    );
+  },
+
+  async fetchAdminRecharges() {
+    return unwrap(
+      getClient()
+        .from('recharge_requests')
+        .select('*, users(full_name, phone, client_code)')
+        .order('created_at', { ascending: false })
     );
   },
 
@@ -98,58 +174,70 @@ export const apiClient = {
     return unwrap(getClient().rpc('admin_dashboard_metrics'));
   },
 
-  async requestWithdrawal(amount, walletAddress, networkType) {
-    return unwrap(getClient().functions.invoke('process-withdrawal', {
-      body: {
-        action: 'request',
-        amount: Number(amount),
-        walletAddress: walletAddress || null,
-        networkType: networkType || null
-      }
-    }));
+  async reviewWithdrawal({ withdrawalId, status, notes, transactionHash }) {
+    return unwrap(
+      getClient().functions.invoke('process-withdrawal', {
+        body: {
+          action: 'review',
+          withdrawalId,
+          status,
+          notes: notes || null,
+          transactionHash: transactionHash || null
+        }
+      })
+    );
   },
 
-  async reviewWithdrawal({ withdrawalId, status, notes }) {
-    return unwrap(getClient().functions.invoke('process-withdrawal', {
-      body: {
-        action: 'review',
-        withdrawalId,
-        status,
-        notes: notes || null
-      }
-    }));
+  async verifyRecharge({ rechargeId, action, adminNotes }) {
+    return unwrap(
+      getClient().functions.invoke('verify-recharge', {
+        body: { rechargeId, action, adminNotes: adminNotes || null }
+      })
+    );
   },
 
   async processPayouts() {
-    return unwrap(getClient().functions.invoke('process-payouts', {
-      body: {
-        source: 'admin-dashboard'
-      }
-    }));
+    return unwrap(
+      getClient().functions.invoke('process-payouts', {
+        body: { source: 'admin-dashboard' }
+      })
+    );
   },
 
   async adminCreditWallet({ userId, amount, description }) {
-    return unwrap(getClient().rpc('admin_credit_wallet', {
-      p_user_id: userId,
-      p_amount: Number(amount),
-      p_description: description || 'Admin fund transfer'
-    }));
+    return unwrap(
+      getClient().rpc('admin_credit_wallet', {
+        p_user_id: userId,
+        p_amount: Number(amount),
+        p_description: description || 'Admin fund transfer'
+      })
+    );
   },
 
   async adminResetPassword(email) {
-    return unwrap(getClient().auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/index.html`
-    }));
+    return unwrap(
+      getClient().auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/index.html`
+      })
+    );
   },
 
+  // Replaced unsafe direct-table update with server-side RPC
   async adminToggleUserStatus({ userId, newStatus }) {
-    return unwrap(getClient().from('users').update({ status: newStatus }).eq('id', userId));
+    return unwrap(
+      getClient().rpc('admin_set_user_status', {
+        p_user_id: userId,
+        p_status: newStatus
+      })
+    );
   },
 
-  async recordGrowRushReward(amount) {
-    return unwrap(getClient().rpc('record_grow_rush_reward', {
-      p_reward_amount: Number(amount)
-    }));
+  async adminAllocatePackage({ clientUserId, packageId }) {
+    return unwrap(
+      getClient().functions.invoke('admin-allocate-package', {
+        body: { clientUserId, packageId }
+      })
+    );
   },
 
   subscribeToTables(channelName, tables, callback) {

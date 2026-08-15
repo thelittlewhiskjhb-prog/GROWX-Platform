@@ -3,13 +3,15 @@ import { supabaseAuth } from './supabase-auth.js';
 import { renderAdminUsers } from './admin-users.js';
 import { renderAdminPackages } from './admin-packages.js';
 import { renderAdminWithdrawals } from './admin-withdrawals.js';
+import { renderAdminRecharges } from './admin-recharges.js';
 
 const state = {
   unsubscribe: null,
   metrics: null,
   users: [],
   userPackages: [],
-  withdrawals: []
+  withdrawals: [],
+  recharges: []
 };
 
 const elements = {
@@ -20,6 +22,7 @@ const elements = {
   metricsRoot: document.querySelector('#admin-metrics'),
   usersRoot: document.querySelector('#admin-users-root'),
   packagesRoot: document.querySelector('#admin-packages-root'),
+  rechargesRoot: document.querySelector('#admin-recharges-root'),
   withdrawalsRoot: document.querySelector('#admin-withdrawals-root'),
   logoutButton: document.querySelector('#admin-logout-button'),
   processPayoutsButton: document.querySelector('#process-payouts-button')
@@ -50,18 +53,26 @@ async function refreshAdminDashboard() {
     throw new Error('This account does not have admin access.');
   }
 
-  state.metrics = await apiClient.fetchAdminMetrics();
-  state.users = await apiClient.fetchAdminUsers();
-  state.userPackages = await apiClient.fetchAdminPackages();
-  state.withdrawals = await apiClient.fetchAdminWithdrawals();
+  [state.metrics, state.users, state.userPackages, state.withdrawals, state.recharges] = await Promise.all([
+    apiClient.fetchAdminMetrics(),
+    apiClient.fetchAdminUsers(),
+    apiClient.fetchAdminPackages(),
+    apiClient.fetchAdminWithdrawals(),
+    apiClient.fetchAdminRecharges()
+  ]);
 
   renderMetrics(state.metrics);
   renderAdminUsers(elements.usersRoot, state.users, {
     onTransferFunds: transferFunds,
     onToggleStatus: toggleUserStatus,
-    onResetPassword: resetClientPassword
+    onResetPassword: resetClientPassword,
+    onAllocatePackage: allocatePackage,
+    packages: state.packages || []
   });
   renderAdminPackages(elements.packagesRoot, state.userPackages);
+  renderAdminRecharges(elements.rechargesRoot, state.recharges, {
+    onVerifyRecharge: verifyRecharge
+  });
   renderAdminWithdrawals(elements.withdrawalsRoot, state.withdrawals, {
     onReview: reviewWithdrawal
   });
@@ -71,7 +82,7 @@ function startRealtimeSync() {
   state.unsubscribe?.();
   state.unsubscribe = apiClient.subscribeToTables(
     'growx-admin-sync',
-    ['users', 'user_packages', 'cycles', 'withdrawals', 'transactions'],
+    ['users', 'user_packages', 'cycles', 'withdrawals', 'transactions', 'recharge_requests'],
     () => refreshAdminDashboard().catch((error) => setStatus(error.message, 'danger'))
   );
 }
@@ -123,9 +134,47 @@ async function resetClientPassword(email) {
   }
 }
 
+async function allocatePackage({ clientUserId, packageId }) {
+  try {
+    setStatus('Allocating package…');
+    await apiClient.adminAllocatePackage({ clientUserId, packageId });
+    setStatus('Package allocated successfully.', 'success');
+    await refreshAdminDashboard();
+  } catch (error) {
+    setStatus(error.message || 'Package allocation failed.', 'danger');
+  }
+}
+
+async function reviewWithdrawal(withdrawalId, status, notes, transactionHash) {
+  try {
+    setStatus(`Updating withdrawal to ${status}…`);
+    await apiClient.reviewWithdrawal({ withdrawalId, status, notes, transactionHash });
+    setStatus(`Withdrawal marked as ${status}.`, 'success');
+    await refreshAdminDashboard();
+  } catch (error) {
+    setStatus(error.message || 'Withdrawal update failed.', 'danger');
+  }
+}
+
+async function verifyRecharge({ rechargeId, action, adminNotes }) {
+  try {
+    setStatus(`${action === 'verify' ? 'Verifying' : 'Rejecting'} deposit…`);
+    await apiClient.verifyRecharge({ rechargeId, action, adminNotes });
+    setStatus(
+      action === 'verify' ? 'Deposit verified and balance credited.' : 'Deposit rejected.',
+      'success'
+    );
+    await refreshAdminDashboard();
+  } catch (error) {
+    setStatus(error.message || 'Deposit action failed.', 'danger');
+  }
+}
+
 async function handleLogin(event) {
   event.preventDefault();
   const formData = new FormData(event.currentTarget);
+  const submitBtn = event.currentTarget.querySelector('[type="submit"]');
+  submitBtn.disabled = true;
 
   try {
     setStatus('Signing in to admin dashboard…');
@@ -138,17 +187,8 @@ async function handleLogin(event) {
     await resolveAdminShell();
   } catch (error) {
     setStatus(error.message || 'Admin login failed.', 'danger');
-  }
-}
-
-async function reviewWithdrawal(withdrawalId, status) {
-  try {
-    setStatus(`Updating withdrawal to ${status}…`);
-    await apiClient.reviewWithdrawal({ withdrawalId, status });
-    setStatus(`Withdrawal marked as ${status}.`, 'success');
-    await refreshAdminDashboard();
-  } catch (error) {
-    setStatus(error.message || 'Withdrawal update failed.', 'danger');
+  } finally {
+    submitBtn.disabled = false;
   }
 }
 
@@ -179,9 +219,7 @@ supabaseAuth.onAuthStateChange(() => {
 });
 
 elements.authForm?.addEventListener('submit', handleLogin);
-
 elements.logoutButton?.addEventListener('click', handleLogout);
-
 elements.processPayoutsButton?.addEventListener('click', handleProcessPayouts);
 
 resolveAdminShell().catch((error) => setStatus(error.message, 'danger'));

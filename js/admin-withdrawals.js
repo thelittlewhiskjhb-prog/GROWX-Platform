@@ -5,12 +5,15 @@ function formatCurrency(value) {
   }).format(Number(value || 0));
 }
 
+const NETWORK_LABELS = { trc20: 'TRC20 (Tron)', erc20: 'ERC20 (Ethereum)' };
+
 function buildDetailModal(entry) {
-  const networkLabel = entry.network_type ? entry.network_type.toUpperCase() : '—';
+  const networkLabel = entry.network ? NETWORK_LABELS[entry.network] || entry.network.toUpperCase() : '—';
   const walletAddress = entry.wallet_address || '—';
-  const canApprove = entry.status === 'pending';
-  const canReject = entry.status === 'pending' || entry.status === 'approved';
-  const canMarkDone = entry.status === 'approved';
+
+  const canApprove  = entry.status === 'processing';
+  const canReject   = entry.status === 'processing' || entry.status === 'approved';
+  const canComplete = entry.status === 'approved';
 
   return `
     <div class="modal-backdrop" id="withdrawal-modal">
@@ -22,6 +25,8 @@ function buildDetailModal(entry) {
         <dl class="detail-list">
           <dt>Client</dt>
           <dd>${entry.users?.full_name || '—'}</dd>
+          <dt>Client code</dt>
+          <dd>${entry.users?.client_code || '—'}</dd>
           <dt>Phone</dt>
           <dd>${entry.users?.phone || '—'}</dd>
           <dt>Requested</dt>
@@ -32,17 +37,33 @@ function buildDetailModal(entry) {
           <dd>${formatCurrency(entry.fee_amount)}</dd>
           <dt>Net payout</dt>
           <dd><strong>${formatCurrency(entry.net_amount)}</strong></dd>
-          <dt>Status</dt>
-          <dd>${entry.status}</dd>
           <dt>Network</dt>
           <dd>${networkLabel}</dd>
-          <dt>Wallet address</dt>
+          <dt>USDT address</dt>
           <dd class="wallet-address">${walletAddress}</dd>
+          <dt>Status</dt>
+          <dd>${entry.status}</dd>
+          ${entry.admin_notes ? `<dt>Admin notes</dt><dd>${entry.admin_notes}</dd>` : ''}
+          ${entry.admin_transaction_hash ? `<dt>Transaction hash</dt><dd class="wallet-address">${entry.admin_transaction_hash}</dd>` : ''}
+          ${entry.processed_at ? `<dt>Processed</dt><dd>${new Date(entry.processed_at).toLocaleString()}</dd>` : ''}
         </dl>
+
+        <label>
+          <span>Admin notes (optional)</span>
+          <input id="modal-notes" type="text" placeholder="Notes for audit record" value="${entry.admin_notes || ''}" />
+        </label>
+
+        ${canComplete ? `
+          <label>
+            <span>Blockchain transaction hash</span>
+            <input id="modal-tx-hash" type="text" placeholder="Paste transaction hash" />
+          </label>
+        ` : ''}
+
         <div class="button-row">
           <button class="secondary-button" data-modal-approve="${entry.id}" ${canApprove ? '' : 'disabled'}>Approve</button>
           <button class="danger-button" data-modal-reject="${entry.id}" ${canReject ? '' : 'disabled'}>Reject</button>
-          <button class="primary-button" data-modal-done="${entry.id}" ${canMarkDone ? '' : 'disabled'}>Done</button>
+          <button class="primary-button" data-modal-done="${entry.id}" ${canComplete ? '' : 'disabled'}>Mark completed</button>
         </div>
       </article>
     </div>
@@ -60,6 +81,7 @@ export function renderAdminWithdrawals(container, withdrawals, handlers) {
           <thead>
             <tr>
               <th>Client</th>
+              <th>Code</th>
               <th>Requested</th>
               <th>Gross</th>
               <th>Fee</th>
@@ -70,33 +92,25 @@ export function renderAdminWithdrawals(container, withdrawals, handlers) {
             </tr>
           </thead>
           <tbody>
-            ${withdrawals.length ? withdrawals.map((entry) => {
-              const canApprove = entry.status === 'pending';
-              const canReject = entry.status === 'pending' || entry.status === 'approved';
-              const canMarkDone = entry.status === 'approved';
-              return `
-                <tr>
-                  <td>
-                    <button class="link-button" data-view="${entry.id}" type="button">
-                      ${entry.users?.full_name || '—'}
-                    </button>
-                  </td>
-                  <td>${new Date(entry.requested_at).toLocaleString()}</td>
-                  <td>${formatCurrency(entry.gross_amount)}</td>
-                  <td>${formatCurrency(entry.fee_amount)}</td>
-                  <td>${formatCurrency(entry.net_amount)}</td>
-                  <td>${entry.network_type ? entry.network_type.toUpperCase() : '—'}</td>
-                  <td>${entry.status}</td>
-                  <td>
-                    <div class="button-row">
-                      <button class="secondary-button" data-approve="${entry.id}" ${canApprove ? '' : 'disabled'}>Approve</button>
-                      <button class="danger-button" data-reject="${entry.id}" ${canReject ? '' : 'disabled'}>Reject</button>
-                      <button class="primary-button" data-done="${entry.id}" ${canMarkDone ? '' : 'disabled'}>Done</button>
-                    </div>
-                  </td>
-                </tr>
-              `;
-            }).join('') : '<tr><td colspan="8">No withdrawals found.</td></tr>'}
+            ${withdrawals.length ? withdrawals.map((entry) => `
+              <tr>
+                <td>
+                  <button class="link-button" data-view="${entry.id}" type="button">
+                    ${entry.users?.full_name || '—'}
+                  </button>
+                </td>
+                <td>${entry.users?.client_code || '—'}</td>
+                <td>${new Date(entry.requested_at).toLocaleString()}</td>
+                <td>${formatCurrency(entry.gross_amount)}</td>
+                <td>${formatCurrency(entry.fee_amount)}</td>
+                <td>${formatCurrency(entry.net_amount)}</td>
+                <td>${entry.network ? NETWORK_LABELS[entry.network] || entry.network.toUpperCase() : '—'}</td>
+                <td><span class="badge ${entry.status}">${entry.status}</span></td>
+                <td>
+                  <button class="secondary-button" data-view="${entry.id}" type="button">View</button>
+                </td>
+              </tr>
+            `).join('') : '<tr><td colspan="9">No withdrawals found.</td></tr>'}
           </tbody>
         </table>
       </div>
@@ -115,34 +129,27 @@ export function renderAdminWithdrawals(container, withdrawals, handlers) {
       modalRoot.innerHTML = '';
     });
 
+    const getNotes = () => modalRoot.querySelector('#modal-notes')?.value?.trim() || null;
+    const getTxHash = () => modalRoot.querySelector('#modal-tx-hash')?.value?.trim() || null;
+
     modalRoot.querySelector(`[data-modal-approve="${withdrawalId}"]`)?.addEventListener('click', async () => {
       modalRoot.innerHTML = '';
-      await handlers.onReview(withdrawalId, 'approved');
+      await handlers.onReview(withdrawalId, 'approved', getNotes(), null);
     });
 
     modalRoot.querySelector(`[data-modal-reject="${withdrawalId}"]`)?.addEventListener('click', async () => {
       modalRoot.innerHTML = '';
-      await handlers.onReview(withdrawalId, 'rejected');
+      await handlers.onReview(withdrawalId, 'rejected', getNotes(), null);
     });
 
     modalRoot.querySelector(`[data-modal-done="${withdrawalId}"]`)?.addEventListener('click', async () => {
+      const txHash = getTxHash();
       modalRoot.innerHTML = '';
-      await handlers.onReview(withdrawalId, 'paid');
+      await handlers.onReview(withdrawalId, 'completed', getNotes(), txHash);
     });
   }
 
   container.querySelectorAll('[data-view]').forEach((button) => {
     button.addEventListener('click', () => openModal(button.dataset.view));
   });
-
-  container.querySelectorAll('[data-approve]').forEach((button) => {
-    button.addEventListener('click', () => handlers.onReview(button.dataset.approve, 'approved'));
-  });
-  container.querySelectorAll('[data-reject]').forEach((button) => {
-    button.addEventListener('click', () => handlers.onReview(button.dataset.reject, 'rejected'));
-  });
-  container.querySelectorAll('[data-done]').forEach((button) => {
-    button.addEventListener('click', () => handlers.onReview(button.dataset.done, 'paid'));
-  });
 }
-

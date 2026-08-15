@@ -4,17 +4,20 @@ import '../components/cycle-progress.js';
 import { apiClient } from './api-client.js';
 import { supabaseAuth } from './supabase-auth.js';
 import { storageManager } from './storage-manager.js';
-import { renderPackageManager, formatCurrency } from './package-manager.js';
+import { formatCurrency } from './package-manager.js';
 import { renderCycleTracker, getNextPayout } from './cycle-tracker.js';
 import { renderWithdrawalManager } from './withdrawal-manager.js';
+import { renderRechargeManager } from './recharge-manager.js';
+import { renderGiftManager } from './gift-manager.js';
+import { renderRewardManager } from './reward-manager.js';
 
 const state = {
   session: null,
   user: null,
   profile: null,
-  packages: [],
   userPackages: [],
   withdrawals: [],
+  recharges: [],
   transactions: [],
   unsubscribe: null
 };
@@ -38,8 +41,10 @@ const elements = {
     activePackages: document.querySelector('#active-packages')
   },
   cycleRoot: document.querySelector('#cycle-root'),
-  packagesRoot: document.querySelector('#packages-root'),
+  rechargeRoot: document.querySelector('#recharge-root'),
   withdrawalsRoot: document.querySelector('#withdrawals-root'),
+  giftRoot: document.querySelector('#gift-root'),
+  rewardRoot: document.querySelector('#reward-root'),
   transactionsRoot: document.querySelector('#transactions-root')
 };
 
@@ -91,9 +96,9 @@ function renderTransactions() {
 
 async function refreshDashboard() {
   state.profile = await apiClient.fetchProfile();
-  state.packages = await apiClient.listPackages();
   state.userPackages = await apiClient.fetchClientPackages();
   state.withdrawals = await apiClient.fetchWithdrawals();
+  state.recharges = await apiClient.fetchRechargeRequests();
   state.transactions = await apiClient.fetchTransactions();
 
   const activeCount = state.userPackages.filter((item) => item.status === 'active').length;
@@ -107,13 +112,14 @@ async function refreshDashboard() {
     : 'No pending payout';
 
   renderCycleTracker(elements.cycleRoot, state.userPackages);
-  renderPackageManager({
-    container: elements.packagesRoot,
-    packages: state.packages,
-    userPackages: state.userPackages,
+
+  renderRechargeManager({
+    container: elements.rechargeRoot,
+    recharges: state.recharges,
     setStatus,
-    onPurchased: refreshDashboard
+    onSubmitted: refreshDashboard
   });
+
   renderWithdrawalManager({
     container: elements.withdrawalsRoot,
     profile: state.profile,
@@ -121,6 +127,19 @@ async function refreshDashboard() {
     setStatus,
     onSubmitted: refreshDashboard
   });
+
+  renderGiftManager({
+    container: elements.giftRoot,
+    setStatus,
+    onRedeemed: refreshDashboard
+  });
+
+  await renderRewardManager({
+    container: elements.rewardRoot,
+    setStatus,
+    onClaimed: refreshDashboard
+  });
+
   renderTransactions();
 }
 
@@ -128,7 +147,7 @@ function startRealtimeSync() {
   state.unsubscribe?.();
   state.unsubscribe = apiClient.subscribeToTables(
     'growx-client-sync',
-    ['users', 'user_packages', 'cycles', 'withdrawals', 'transactions', 'game_rewards'],
+    ['users', 'user_packages', 'cycles', 'withdrawals', 'transactions', 'reward_claims', 'recharge_requests'],
     () => refreshDashboard().catch((error) => setStatus(error.message, 'danger'))
   );
 }
@@ -185,6 +204,8 @@ async function handleProfileSetup(event) {
 async function handleRegister(event) {
   event.preventDefault();
   const formData = new FormData(event.currentTarget);
+  const submitBtn = event.currentTarget.querySelector('[type="submit"]');
+  submitBtn.disabled = true;
   setStatus('Creating your secure account…');
 
   try {
@@ -207,12 +228,16 @@ async function handleRegister(event) {
     await resolveShell();
   } catch (error) {
     setStatus(error.message || 'Registration failed.', 'danger');
+  } finally {
+    submitBtn.disabled = false;
   }
 }
 
 async function handleLogin(event) {
   event.preventDefault();
   const formData = new FormData(event.currentTarget);
+  const submitBtn = event.currentTarget.querySelector('[type="submit"]');
+  submitBtn.disabled = true;
   setStatus('Signing in…');
 
   try {
@@ -225,6 +250,8 @@ async function handleLogin(event) {
     await resolveShell();
   } catch (error) {
     setStatus(error.message || 'Sign-in failed.', 'danger');
+  } finally {
+    submitBtn.disabled = false;
   }
 }
 
@@ -233,6 +260,8 @@ async function handleOtp(event) {
   const formData = new FormData(event.currentTarget);
   const phone = formData.get('otpPhone')?.toString().trim();
   const token = formData.get('otpToken')?.toString().trim();
+  const submitBtn = event.currentTarget.querySelector('[type="submit"]');
+  submitBtn.disabled = true;
 
   try {
     if (token) {
@@ -246,6 +275,8 @@ async function handleOtp(event) {
     setStatus('OTP sent to your phone. Enter the code to finish phone login.', 'success');
   } catch (error) {
     setStatus(error.message || 'Phone authentication failed.', 'danger');
+  } finally {
+    submitBtn.disabled = false;
   }
 }
 
@@ -278,39 +309,18 @@ async function handleLogout() {
   }
 }
 
-window.addEventListener('growx:reward-earned', async (event) => {
-  const rewardAmount = Number(event.detail?.amount || 0);
-  if (!rewardAmount) return;
-
-  try {
-    await apiClient.recordGrowRushReward(rewardAmount);
-    setStatus(`GROW RUSH reward synced: ${formatCurrency(rewardAmount)}.`, 'success');
-    if (!elements.dashboardShell.hidden) {
-      await refreshDashboard();
-    }
-  } catch (error) {
-    setStatus(error.message || 'Unable to sync GROW RUSH reward.', 'danger');
-  }
-});
-
 supabaseAuth.onAuthStateChange(() => {
   resolveShell().catch((error) => setStatus(error.message, 'danger'));
 });
 
 elements.registerForm?.addEventListener('submit', handleRegister);
-
 elements.loginForm?.addEventListener('submit', handleLogin);
-
 elements.otpForm?.addEventListener('submit', handleOtp);
-
 elements.profileSetupForm?.addEventListener('submit', handleProfileSetup);
-
 elements.pinLogin?.addEventListener('pin-submit', handlePin);
-
 elements.logoutButton?.addEventListener('click', handleLogout);
 
-resolveShell().catch((error) => setStatus(error.message, 'danger'));
-
+// Wire up static copy buttons for the recharge addresses section
 document.querySelectorAll('.copy-button[data-copy-target]').forEach((button) => {
   button.addEventListener('click', async () => {
     const targetId = button.dataset.copyTarget;
@@ -331,3 +341,5 @@ document.querySelectorAll('.copy-button[data-copy-target]').forEach((button) => 
     }
   });
 });
+
+resolveShell().catch((error) => setStatus(error.message, 'danger'));

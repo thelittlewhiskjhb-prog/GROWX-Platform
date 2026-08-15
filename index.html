@@ -14,8 +14,8 @@
       <header class="hero">
         <div>
           <p class="eyebrow">GROWX Platform</p>
-          <h1>Client access and secure package tracking</h1>
-          <p>Session-based Supabase auth, 4-digit PIN unlock, 6-cycle package returns, and 10% withdrawal fee processing.</p>
+          <h1>Client dashboard</h1>
+          <p>Secure 4-digit PIN access, package cycle tracking, USDT recharge and withdrawal.</p>
         </div>
         <button id="logout-button" class="ghost-button" type="button">Sign out</button>
       </header>
@@ -28,7 +28,7 @@
             <div class="section-header">
               <div>
                 <h2>Register client account</h2>
-                <p>Use email/password or phone/password. Enter a 4-digit PIN to preserve the existing client access flow.</p>
+                <p>Use email/password or phone/password. Set a 4-digit PIN to secure your session.</p>
               </div>
               <terms-modal label="Registration clauses"></terms-modal>
             </div>
@@ -59,7 +59,7 @@
         </div>
         <article id="profile-setup-card" class="card stack gap-sm" hidden>
           <h2>Complete profile setup</h2>
-          <p>Your account is authenticated, but your client profile still needs a 4-digit PIN before dashboard access can be unlocked.</p>
+          <p>Your account is authenticated. Set a 4-digit PIN before unlocking the dashboard.</p>
           <form id="profile-setup-form" class="stack gap-sm">
             <label><span>Full name</span><input name="fullName" type="text" required /></label>
             <label><span>Phone</span><input name="phone" type="tel" /></label>
@@ -81,26 +81,22 @@
           <article class="card"><p>Next payout</p><p id="next-payout" class="metric-value small">No pending payout</p></article>
         </div>
 
-        <section id="recharge-root">
-          <div class="card stack gap-sm">
-            <h2>Recharge — USDT deposit addresses</h2>
-            <p class="muted-text">Send USDT to one of the addresses below, then notify support with your transaction hash.</p>
-            <div class="address-row">
-              <span class="address-label">ERC20 (Ethereum)</span>
-              <span class="address-value" id="erc20-address">0xe5f65dd88d16ea1ff9a9682d6ed8e10993c3c9a0</span>
-              <button type="button" class="copy-button secondary-button" data-copy-target="erc20-address" aria-label="Copy ERC20 address">Copy</button>
-            </div>
-            <div class="address-row">
-              <span class="address-label">TRC20 (Tron)</span>
-              <span class="address-value" id="trc20-address">TRmdXgVDBfC7z54fD3gHS2zXHd2E77CjXV</span>
-              <button type="button" class="copy-button secondary-button" data-copy-target="trc20-address" aria-label="Copy TRC20 address">Copy</button>
-            </div>
-          </div>
-        </section>
+        <!-- Recharge section: rendered dynamically with DB-backed addresses -->
+        <section id="recharge-root"></section>
 
+        <!-- Daily reward section -->
+        <section id="reward-root"></section>
+
+        <!-- Package cycle tracker -->
         <section id="cycle-root"></section>
-        <section id="packages-root"></section>
+
+        <!-- Withdrawal section -->
         <section id="withdrawals-root"></section>
+
+        <!-- Gift code redemption -->
+        <section id="gift-root"></section>
+
+        <!-- Transaction history -->
         <section id="transactions-root"></section>
       </section>
     </main>
