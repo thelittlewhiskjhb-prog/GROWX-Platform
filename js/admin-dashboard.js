@@ -56,7 +56,11 @@ async function refreshAdminDashboard() {
   state.withdrawals = await apiClient.fetchAdminWithdrawals();
 
   renderMetrics(state.metrics);
-  renderAdminUsers(elements.usersRoot, state.users);
+  renderAdminUsers(elements.usersRoot, state.users, {
+    onTransferFunds: transferFunds,
+    onToggleStatus: toggleUserStatus,
+    onResetPassword: resetClientPassword
+  });
   renderAdminPackages(elements.packagesRoot, state.userPackages);
   renderAdminWithdrawals(elements.withdrawalsRoot, state.withdrawals, {
     onReview: reviewWithdrawal
@@ -85,6 +89,38 @@ async function resolveAdminShell() {
   elements.authShell.hidden = true;
   elements.dashboardShell.hidden = false;
   startRealtimeSync();
+}
+
+async function transferFunds({ userId, amount, description }) {
+  try {
+    setStatus('Transferring funds…');
+    await apiClient.adminCreditWallet({ userId, amount, description });
+    setStatus(`Transferred $${Number(amount).toFixed(2)} to client wallet.`, 'success');
+    await refreshAdminDashboard();
+  } catch (error) {
+    setStatus(error.message || 'Fund transfer failed.', 'danger');
+  }
+}
+
+async function toggleUserStatus({ userId, newStatus }) {
+  try {
+    setStatus(`Setting account to ${newStatus}…`);
+    await apiClient.adminToggleUserStatus({ userId, newStatus });
+    setStatus(`Account status updated to ${newStatus}.`, 'success');
+    await refreshAdminDashboard();
+  } catch (error) {
+    setStatus(error.message || 'Status update failed.', 'danger');
+  }
+}
+
+async function resetClientPassword(email) {
+  try {
+    setStatus('Sending password reset email…');
+    await apiClient.adminResetPassword(email);
+    setStatus(`Password reset email sent to ${email}.`, 'success');
+  } catch (error) {
+    setStatus(error.message || 'Password reset failed.', 'danger');
+  }
 }
 
 async function handleLogin(event) {

@@ -128,6 +128,24 @@ export const apiClient = {
     }));
   },
 
+  async adminCreditWallet({ userId, amount, description }) {
+    return unwrap(getClient().rpc('admin_credit_wallet', {
+      p_user_id: userId,
+      p_amount: Number(amount),
+      p_description: description || 'Admin fund transfer'
+    }));
+  },
+
+  async adminResetPassword(email) {
+    return unwrap(getClient().auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/index.html`
+    }));
+  },
+
+  async adminToggleUserStatus({ userId, newStatus }) {
+    return unwrap(getClient().from('users').update({ status: newStatus }).eq('id', userId));
+  },
+
   async recordGrowRushReward(amount) {
     return unwrap(getClient().rpc('record_grow_rush_reward', {
       p_reward_amount: Number(amount)

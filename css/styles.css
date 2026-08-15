@@ -434,3 +434,17 @@ fieldset.stack legend {
   color: var(--accent);
   border-color: var(--accent);
 }
+
+/* Admin user management modal */
+.modal-card h4 {
+  margin: 0 0 0.25rem;
+  font-size: 0.95rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.user-manage-btn {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.82rem;
+}
