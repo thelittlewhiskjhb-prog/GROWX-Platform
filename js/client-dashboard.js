@@ -4,7 +4,7 @@ import '../components/cycle-progress.js';
 import { apiClient } from './api-client.js';
 import { supabaseAuth } from './supabase-auth.js';
 import { storageManager } from './storage-manager.js';
-import { formatCurrency } from './package-manager.js';
+import { formatCurrency, renderPackageManager } from './package-manager.js';
 import { renderCycleTracker, getNextPayout } from './cycle-tracker.js';
 import { renderWithdrawalManager } from './withdrawal-manager.js';
 import { renderRechargeManager } from './recharge-manager.js';
@@ -112,7 +112,14 @@ async function refreshDashboard() {
     : 'No pending payout';
 
   renderCycleTracker(elements.cycleRoot, state.userPackages);
-
+  renderPackageManager({
+    container: document.querySelector('#packages-root'),
+    packages: await apiClient.listPackages(),
+    userPackages: state.userPackages,
+    walletBalance: state.profile.wallet_balance,
+    setStatus,
+    onPurchased: refreshDashboard
+  });
   renderRechargeManager({
     container: elements.rechargeRoot,
     recharges: state.recharges,
