@@ -34,6 +34,7 @@ function buildUserModal(user, handlers) {
           <form id="fund-transfer-form" class="stack gap-sm">
             <label><span>Amount (USD)</span><input name="amount" type="number" min="0.01" step="0.01" required /></label>
             <label><span>Description</span><input name="description" type="text" placeholder="Admin credit" /></label>
+            <p class="status-message" data-tone="danger" aria-live="polite" hidden></p>
             <button type="submit" class="primary-button">Transfer funds</button>
           </form>
         </section>
@@ -108,7 +109,15 @@ export function renderAdminUsers(container, users, handlers) {
     modalRoot.querySelector('#fund-transfer-form')?.addEventListener('submit', async (event) => {
       event.preventDefault();
       const formData = new FormData(event.currentTarget);
-      const amount = formData.get('amount');
+      const amount = Number(formData.get('amount'));
+      if (!amount || amount <= 0) {
+        const errorEl = event.currentTarget.querySelector('.status-message');
+        if (errorEl) {
+          errorEl.textContent = 'Enter a valid amount greater than zero.';
+          errorEl.hidden = false;
+        }
+        return;
+      }
       const description = formData.get('description')?.toString().trim();
       modalRoot.innerHTML = '';
       await handlers.onTransferFunds({ userId: user.id, amount, description });
