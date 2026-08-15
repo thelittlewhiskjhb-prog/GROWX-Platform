@@ -1,9 +1,29 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-cron-secret'
-};
+function buildCorsHeaders(origin: string) {
+  return {
+    'Access-Control-Allow-Origin': origin,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-cron-secret'
+  };
+}
+
+function resolveAllowedOrigin(request: Request) {
+  const configuredOrigin = Deno.env.get('APP_ORIGIN')?.trim() ?? '';
+  const requestOrigin = request.headers.get('Origin')?.trim() ?? '';
+
+  if (!configuredOrigin) {
+    return '';
+  }
+
+  return requestOrigin === configuredOrigin ? requestOrigin : configuredOrigin;
+}
+
+function isDisallowedBrowserOrigin(request: Request) {
+  const configuredOrigin = Deno.env.get('APP_ORIGIN')?.trim() ?? '';
+  const requestOrigin = request.headers.get('Origin')?.trim() ?? '';
+
+  return Boolean(configuredOrigin && requestOrigin && requestOrigin !== configuredOrigin);
+}
 
 async function isAdminUser(supabaseUrl: string, serviceRoleKey: string, token: string) {
   const adminClient = createClient(supabaseUrl, serviceRoleKey);
@@ -24,6 +44,15 @@ async function isAdminUser(supabaseUrl: string, serviceRoleKey: string, token: s
 }
 
 Deno.serve(async (request) => {
+  const corsHeaders = buildCorsHeaders(resolveAllowedOrigin(request));
+
+  if (isDisallowedBrowserOrigin(request)) {
+    return new Response(JSON.stringify({ error: 'Origin not allowed.' }), {
+      status: 403,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+
   if (request.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }

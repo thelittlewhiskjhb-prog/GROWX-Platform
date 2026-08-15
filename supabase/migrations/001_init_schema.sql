@@ -492,7 +492,7 @@ begin
     raise exception 'Only pending or approved withdrawals can be rejected';
   end if;
 
-  if p_status = 'rejected' and v_withdrawal.status <> 'rejected' then
+  if p_status = 'rejected' then
     update public.users
     set wallet_balance = wallet_balance + v_withdrawal.gross_amount,
         updated_at = timezone('utc', now())
@@ -788,5 +788,5 @@ grant execute on function public.purchase_package(uuid) to authenticated;
 grant execute on function public.record_grow_rush_reward(numeric) to authenticated;
 grant execute on function public.create_withdrawal_request(numeric) to authenticated;
 grant execute on function public.process_withdrawal_request(uuid, text, text) to authenticated;
-grant execute on function public.process_due_cycles() to authenticated;
 grant execute on function public.admin_dashboard_metrics() to authenticated;
+grant execute on function public.process_due_cycles() to service_role;

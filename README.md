@@ -107,3 +107,13 @@ After configuring Supabase:
 4. Purchase a package and confirm that six cycles are created.
 5. Process payouts and confirm wallet balance updates in real time.
 6. Submit a withdrawal and confirm the 10% fee is shown before confirmation.
+
+## Edge function origin lock
+
+Set `APP_ORIGIN` in Supabase Function secrets to the exact deployed frontend origin, for example:
+
+```env
+APP_ORIGIN=https://app.growx.example
+```
+
+Both financial edge functions reject browser requests from other origins.
