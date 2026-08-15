@@ -28,6 +28,7 @@ returns boolean
 language sql
 security definer
 stable
+set search_path = public
 as $$
   select coalesce(
     (select role = 'admin' from public.users where id = auth.uid()),
@@ -41,6 +42,7 @@ returns boolean
 language sql
 security definer
 stable
+set search_path = public
 as $$
   select coalesce(
     (select status = 'active' from public.users where id = auth.uid()),
@@ -61,12 +63,8 @@ create policy "admins_select_all_profiles"
   on public.users for select
   using (public.is_admin());
 
--- No direct UPDATE by any client — balance changes go through RPCs
--- Admins can update non-financial fields through is_admin() check
-create policy "admins_update_user_non_financial"
-  on public.users for update
-  using (public.is_admin())
-  with check (public.is_admin());
+-- No direct UPDATE from client-side SQL. Admin updates must use RPC/Edge paths
+-- where each action is validated and audited.
 
 -- ============================================================
 -- PACKAGES TABLE POLICIES

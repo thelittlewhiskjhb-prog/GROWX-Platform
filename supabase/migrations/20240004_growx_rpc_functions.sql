@@ -536,3 +536,99 @@ begin
   return json_build_object('processed_cycles', v_processed);
 end;
 $$;
+
+-- ============================================================
+-- admin_list_users
+-- Admin-only paginated user listing with optional search.
+-- ============================================================
+create or replace function public.admin_list_users(
+  p_search    text default null,
+  p_page      int default 1,
+  p_page_size int default 25
+)
+returns json
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_page      int := greatest(coalesce(p_page, 1), 1);
+  v_page_size int := least(greatest(coalesce(p_page_size, 25), 1), 100);
+  v_offset    int := (greatest(coalesce(p_page, 1), 1) - 1) * least(greatest(coalesce(p_page_size, 25), 1), 100);
+  v_total     bigint := 0;
+  v_rows      json := '[]'::json;
+begin
+  if not public.is_admin() then
+    raise exception 'Unauthorized';
+  end if;
+
+  select count(*)
+    into v_total
+  from public.users u
+  where coalesce(trim(p_search), '') = ''
+     or u.full_name ilike '%' || trim(p_search) || '%'
+     or u.phone ilike '%' || trim(p_search) || '%'
+     or u.email ilike '%' || trim(p_search) || '%'
+     or u.client_code ilike '%' || trim(p_search) || '%';
+
+  select coalesce(json_agg(to_jsonb(t)), '[]'::json)
+    into v_rows
+  from (
+    select
+      u.id,
+      u.full_name,
+      u.phone,
+      u.email,
+      u.role,
+      u.status,
+      u.client_code,
+      u.wallet_balance,
+      u.reward_balance,
+      u.created_at,
+      u.updated_at
+    from public.users u
+    where coalesce(trim(p_search), '') = ''
+       or u.full_name ilike '%' || trim(p_search) || '%'
+       or u.phone ilike '%' || trim(p_search) || '%'
+       or u.email ilike '%' || trim(p_search) || '%'
+       or u.client_code ilike '%' || trim(p_search) || '%'
+    order by u.created_at desc
+    limit v_page_size
+    offset v_offset
+  ) t;
+
+  return json_build_object(
+    'rows', v_rows,
+    'total', v_total,
+    'page', v_page,
+    'page_size', v_page_size
+  );
+end;
+$$;
+
+-- ============================================================
+-- Function execute permissions hardening
+-- ============================================================
+revoke all on function public.upsert_my_profile(text, text, text) from public;
+revoke all on function public.verify_user_pin(text) from public;
+revoke all on function public.admin_dashboard_metrics() from public;
+revoke all on function public.admin_credit_wallet(uuid, numeric, text) from public;
+revoke all on function public.admin_set_user_status(uuid, text) from public;
+revoke all on function public.admin_allocate_package(uuid, uuid) from public;
+revoke all on function public.claim_daily_reward() from public;
+revoke all on function public.redeem_gift_code(text) from public;
+revoke all on function public.create_recharge_request(numeric, text) from public;
+revoke all on function public.process_payouts() from public;
+revoke all on function public.admin_list_users(text, int, int) from public;
+
+grant execute on function public.upsert_my_profile(text, text, text) to authenticated, service_role;
+grant execute on function public.verify_user_pin(text) to authenticated, service_role;
+grant execute on function public.admin_dashboard_metrics() to authenticated, service_role;
+grant execute on function public.admin_credit_wallet(uuid, numeric, text) to authenticated, service_role;
+grant execute on function public.admin_set_user_status(uuid, text) to authenticated, service_role;
+grant execute on function public.admin_allocate_package(uuid, uuid) to authenticated, service_role;
+grant execute on function public.claim_daily_reward() to authenticated, service_role;
+grant execute on function public.redeem_gift_code(text) to authenticated, service_role;
+grant execute on function public.create_recharge_request(numeric, text) to authenticated, service_role;
+grant execute on function public.process_payouts() to authenticated, service_role;
+grant execute on function public.admin_list_users(text, int, int) to authenticated, service_role;

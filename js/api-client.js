@@ -131,12 +131,13 @@ export const apiClient = {
 
   // ── Admin ─────────────────────────────────────────────────
 
-  async fetchAdminUsers() {
+  async fetchAdminUsers({ page = 1, pageSize = 25, search = '' } = {}) {
     return unwrap(
-      getClient()
-        .from('users')
-        .select('*')
-        .order('created_at', { ascending: false })
+      getClient().rpc('admin_list_users', {
+        p_search: search || null,
+        p_page: Number(page),
+        p_page_size: Number(pageSize)
+      })
     );
   },
 

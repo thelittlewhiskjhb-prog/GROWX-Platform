@@ -14,9 +14,17 @@ Deno.serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
+  if (req.method !== 'POST') {
+    return jsonResponse({ error: 'Method not allowed' }, 405);
+  }
+
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const serviceKey  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   const anonKey     = Deno.env.get('SUPABASE_ANON_KEY');
+
+  if (!supabaseUrl || !serviceKey || !anonKey) {
+    return jsonResponse({ error: 'Missing required server configuration' }, 500);
+  }
 
   const authClient = createClient(supabaseUrl, anonKey, {
     auth: { persistSession: false },
@@ -38,9 +46,11 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: 'Forbidden' }, 403);
     }
 
-    const { clientUserId, packageId } = await req.json();
+    const { clientUserId, packageId } = await req.json().catch(() => ({}));
+    const isClientUuid = typeof clientUserId === 'string' && /^[0-9a-f-]{36}$/i.test(clientUserId);
+    const isPackageUuid = typeof packageId === 'string' && /^[0-9a-f-]{36}$/i.test(packageId);
 
-    if (!clientUserId || !packageId) {
+    if (!isClientUuid || !isPackageUuid) {
       return jsonResponse({ error: 'clientUserId and packageId are required' }, 400);
     }
 

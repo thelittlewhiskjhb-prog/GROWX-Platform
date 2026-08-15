@@ -15,9 +15,17 @@ Deno.serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
+  if (req.method !== 'POST') {
+    return jsonResponse({ error: 'Method not allowed' }, 405);
+  }
+
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const serviceKey  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   const anonKey     = Deno.env.get('SUPABASE_ANON_KEY');
+
+  if (!supabaseUrl || !serviceKey || !anonKey) {
+    return jsonResponse({ error: 'Missing required server configuration' }, 500);
+  }
 
   const authClient = createClient(supabaseUrl, anonKey, {
     auth: { persistSession: false },
@@ -40,7 +48,7 @@ Deno.serve(async (req) => {
       .eq('id', user.id)
       .single();
 
-    const body = await req.json();
+    const body = await req.json().catch(() => ({}));
     const { action } = body;
 
     // ─── CLIENT: Submit withdrawal request ───────────────────
@@ -50,6 +58,13 @@ Deno.serve(async (req) => {
       }
 
       const { amount, walletAddress, networkType } = body;
+      const parsedAmount = Number(amount);
+      const parsedWallet = typeof walletAddress === 'string' ? walletAddress.trim() : '';
+      const parsedNetwork = typeof networkType === 'string' ? networkType : '';
+
+      if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+        return jsonResponse({ error: 'Amount must be greater than zero' }, 400);
+      }
 
       // Delegate to the atomic RPC — validation, balance deduction, and
       // ledger entry all happen in a single database transaction.
@@ -59,9 +74,9 @@ Deno.serve(async (req) => {
       });
 
       const { data: withdrawalId, error: rpcError } = await authUserClient.rpc('request_withdrawal', {
-        p_amount:  Number(amount),
-        p_wallet:  (walletAddress || '').trim(),
-        p_network: networkType || ''
+        p_amount: parsedAmount,
+        p_wallet: parsedWallet,
+        p_network: parsedNetwork
       });
 
       if (rpcError) {
@@ -78,79 +93,33 @@ Deno.serve(async (req) => {
       }
 
       const { withdrawalId, status, notes, transactionHash } = body;
+      const isUuid = typeof withdrawalId === 'string' && /^[0-9a-f-]{36}$/i.test(withdrawalId);
+      const normalizedStatus = typeof status === 'string' ? status : '';
+      const normalizedHash = typeof transactionHash === 'string' ? transactionHash.trim() : '';
 
-      if (!withdrawalId || !['approved', 'rejected', 'completed'].includes(status)) {
+      if (!isUuid || !['approved', 'rejected', 'completed'].includes(normalizedStatus)) {
         return jsonResponse({ error: 'Invalid review parameters' }, 400);
       }
 
-      const { data: w } = await serviceClient
-        .from('withdrawals')
-        .select('*')
-        .eq('id', withdrawalId)
-        .single();
-
-      if (!w) {
-        return jsonResponse({ error: 'Withdrawal not found' }, 404);
+      if (normalizedStatus === 'completed' && !normalizedHash) {
+        return jsonResponse({ error: 'Transaction hash is required for completion' }, 400);
       }
 
-      // Validate state transition
-      const validTransitions = {
-        processing: ['approved', 'rejected'],
-        approved:   ['completed', 'rejected']
-      };
-
-      if (!validTransitions[w.status]?.includes(status)) {
-        return jsonResponse({ error: `Cannot transition from ${w.status} to ${status}` }, 400);
-      }
-
-      const updatePayload = {
-        status,
-        admin_notes: notes || null,
-        processed_by: user.id,
-        processed_at: new Date().toISOString()
-      };
-
-      if (status === 'completed' && transactionHash) {
-        updatePayload.admin_transaction_hash = transactionHash.trim();
-      }
-
-      // If rejected — refund the reserved amount
-      if (status === 'rejected') {
-        const { data: clientProfile } = await serviceClient
-          .from('users')
-          .select('wallet_balance')
-          .eq('id', w.user_id)
-          .single();
-
-        await serviceClient
-          .from('users')
-          .update({
-            wallet_balance: (clientProfile?.wallet_balance ?? 0) + w.gross_amount,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', w.user_id);
-
-        await serviceClient.from('transactions').insert({
-          user_id: w.user_id,
-          transaction_type: 'withdrawal_refund',
-          amount: w.gross_amount,
-          description: `Withdrawal rejected — refund`,
-          reference_id: withdrawalId,
-          reference_type: 'withdrawals'
-        });
-      }
-
-      await serviceClient.from('withdrawals').update(updatePayload).eq('id', withdrawalId);
-
-      await serviceClient.from('audit_log').insert({
-        admin_id: user.id,
-        action: `withdrawal_${status}`,
-        target_table: 'withdrawals',
-        target_id: withdrawalId,
-        details: { status, notes, transactionHash }
+      const { error: reviewError } = await serviceClient.rpc('admin_review_withdrawal', {
+        p_withdrawal_id: withdrawalId,
+        p_status: normalizedStatus,
+        p_admin_notes: typeof notes === 'string' ? notes.trim() : null,
+        p_transaction_hash: normalizedStatus === 'completed' ? normalizedHash : null
       });
 
-      return jsonResponse({ success: true, status });
+      if (reviewError) {
+        const reviewStatus = /not found/i.test(reviewError.message) ? 404
+          : /cannot transition|invalid|required|unauthorized|already/i.test(reviewError.message) ? 400
+          : 500;
+        return jsonResponse({ error: reviewError.message }, reviewStatus);
+      }
+
+      return jsonResponse({ success: true, status: normalizedStatus });
     }
 
     return jsonResponse({ error: 'Unknown action' }, 400);

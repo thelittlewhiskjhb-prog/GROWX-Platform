@@ -14,10 +14,18 @@ Deno.serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
+  if (req.method !== 'POST') {
+    return jsonResponse({ error: 'Method not allowed' }, 405);
+  }
+
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const serviceKey  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     const anonKey     = Deno.env.get('SUPABASE_ANON_KEY');
+
+    if (!supabaseUrl || !serviceKey || !anonKey) {
+      return jsonResponse({ error: 'Missing required server configuration' }, 500);
+    }
 
     // Auth client — verifies the caller's JWT
     const authClient = createClient(supabaseUrl, anonKey, {
@@ -46,95 +54,40 @@ Deno.serve(async (req) => {
       .single();
 
     if (adminProfile?.role !== 'admin') {
-      return new Response(JSON.stringify({ error: 'Forbidden' }), {
-        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      return jsonResponse({ error: 'Forbidden' }, 403);
     }
 
-    const { rechargeId, action, adminNotes } = await req.json();
+    const { rechargeId, action, adminNotes } = await req.json().catch(() => ({}));
 
-    if (!rechargeId || !['verify', 'reject'].includes(action)) {
-      return new Response(JSON.stringify({ error: 'Invalid request' }), {
-        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+    const isUuid = typeof rechargeId === 'string' && /^[0-9a-f-]{36}$/i.test(rechargeId);
+    if (!isUuid || !['verify', 'reject'].includes(action)) {
+      return jsonResponse({ error: 'Invalid request' }, 400);
     }
 
-    // Load the recharge request (must be pending)
-    const { data: recharge, error: fetchError } = await serviceClient
-      .from('recharge_requests')
-      .select('*')
-      .eq('id', rechargeId)
-      .eq('status', 'pending')
-      .single();
-
-    if (fetchError || !recharge) {
-      return new Response(JSON.stringify({ error: 'Recharge request not found or already processed' }), {
-        status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
-    if (action === 'reject') {
-      await serviceClient
-        .from('recharge_requests')
-        .update({ status: 'rejected', admin_notes: adminNotes || null, verified_by: user.id, verified_at: new Date().toISOString() })
-        .eq('id', rechargeId);
-
-      // Audit
-      await serviceClient.from('audit_log').insert({
-        admin_id: user.id,
-        action: 'reject_recharge',
-        target_table: 'recharge_requests',
-        target_id: rechargeId,
-        details: { amount: recharge.amount, notes: adminNotes }
-      });
-
-      return new Response(JSON.stringify({ success: true, action: 'rejected' }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
-    // action === 'verify' — credit the wallet atomically
-    // Use a DB transaction via RPC to ensure balance + ledger are consistent
-    const { error: creditError } = await serviceClient.rpc('admin_credit_wallet', {
-      p_user_id: recharge.user_id,
-      p_amount: recharge.amount,
-      p_description: `Recharge verified — ${recharge.network.toUpperCase()} ${recharge.amount} USDT`
+    const { error: reviewError } = await serviceClient.rpc('admin_review_recharge', {
+      p_recharge_id: rechargeId,
+      p_action: action,
+      p_admin_notes: typeof adminNotes === 'string' ? adminNotes.trim() : null
     });
 
-    if (creditError) {
-      console.error('Credit error:', creditError);
-      return new Response(JSON.stringify({ error: 'Failed to credit wallet. ' + creditError.message }), {
-        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+    if (reviewError) {
+      const status = /not found/i.test(reviewError.message) ? 404
+        : /already processed|invalid|unauthorized/i.test(reviewError.message) ? 400
+        : 500;
+      return jsonResponse({ error: reviewError.message }, status);
     }
 
-    // Mark recharge verified
-    await serviceClient
-      .from('recharge_requests')
-      .update({
-        status: 'verified',
-        admin_notes: adminNotes || null,
-        verified_by: user.id,
-        verified_at: new Date().toISOString()
-      })
-      .eq('id', rechargeId);
-
-    await serviceClient.from('audit_log').insert({
-      admin_id: user.id,
-      action: 'verify_recharge',
-      target_table: 'recharge_requests',
-      target_id: rechargeId,
-      details: { amount: recharge.amount, user_id: recharge.user_id, network: recharge.network }
-    });
-
-    return new Response(JSON.stringify({ success: true, action: 'verified', amount: recharge.amount }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
+    return jsonResponse({ success: true, action: action === 'verify' ? 'verified' : 'rejected' });
 
   } catch (err) {
     console.error('verify-recharge error:', err);
-    return new Response(JSON.stringify({ error: 'Internal server error' }), {
-      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
+    return jsonResponse({ error: 'Internal server error' }, 500);
   }
 });
+
+function jsonResponse(body: Record<string, unknown>, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+  });
+}

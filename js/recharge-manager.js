@@ -8,7 +8,7 @@ function formatDate(value) {
   return value ? new Date(value).toLocaleString() : '—';
 }
 
-const NETWORK_LABELS = { trc20: 'TRC20 (Tron)', erc20: 'ERC20 (Ethereum)' };
+const NETWORK_LABELS = { trc20: 'USDT TRC20', erc20: 'USDT ERC20' };
 
 export function renderRechargeManager({ container, recharges, setStatus, onSubmitted }) {
   if (!container) return;
@@ -17,36 +17,42 @@ export function renderRechargeManager({ container, recharges, setStatus, onSubmi
     <div class="section-header">
       <div>
         <h2>Recharge — USDT deposit</h2>
-        <p>Select a network, copy the deposit address, send USDT externally, then submit a deposit request so our team can verify your payment.</p>
+        <p>Copy the correct address for your selected network, send USDT externally, then submit a deposit request and payment proof to the designated Telegram admin group.</p>
       </div>
     </div>
     <div class="split two">
       <article class="card stack gap-sm">
         <h3>Make a deposit</h3>
-        <p class="warning-box">⚠️ Send USDT using the selected network only. Sending through another network may result in permanent loss of funds.</p>
+        <p class="warning-box">Send USDT using the selected network only.</p>
 
-        <fieldset class="stack gap-xs">
-          <legend>Select network</legend>
-          <label class="inline-radio">
-            <input type="radio" name="recharge_network" value="trc20" id="rn-trc20" /> TRC20 (Tron)
-          </label>
-          <label class="inline-radio">
-            <input type="radio" name="recharge_network" value="erc20" id="rn-erc20" /> ERC20 (Ethereum)
-          </label>
-        </fieldset>
-
-        <div id="deposit-address-display" class="address-row" hidden>
-          <span class="address-label" id="deposit-network-label"></span>
-          <span class="address-value" id="deposit-address-text">Loading…</span>
-          <button type="button" class="copy-button secondary-button" id="copy-deposit-address">Copy</button>
+        <div class="stack gap-xs">
+          <div class="address-row">
+            <span class="address-label">USDT ERC20</span>
+            <span class="address-value" id="deposit-address-erc20">Loading…</span>
+            <button type="button" class="copy-button secondary-button" data-network="erc20">COPY ADDRESS</button>
+          </div>
+          <div class="address-row">
+            <span class="address-label">USDT TRC20</span>
+            <span class="address-value" id="deposit-address-trc20">Loading…</span>
+            <button type="button" class="copy-button secondary-button" data-network="trc20">COPY ADDRESS</button>
+          </div>
         </div>
 
-        <form id="recharge-form" class="stack gap-sm" hidden>
+        <form id="recharge-form" class="stack gap-sm">
+          <fieldset class="stack gap-xs">
+            <legend>Select the network you used to send</legend>
+            <label class="inline-radio">
+              <input type="radio" name="recharge_network" value="erc20" required /> USDT ERC20
+            </label>
+            <label class="inline-radio">
+              <input type="radio" name="recharge_network" value="trc20" required /> USDT TRC20
+            </label>
+          </fieldset>
           <label>
             <span>Amount you are sending (USDT)</span>
             <input id="recharge-amount" type="number" min="1" step="0.01" required />
           </label>
-          <p class="muted-text">After sending, submit this request so our team can verify and credit your balance. Do not click submit before sending.</p>
+          <p class="muted-text">Do not submit before sending. Your balance is credited only after admin verification.</p>
           <button type="submit" class="primary-button" id="recharge-submit-btn">Submit deposit request</button>
         </form>
       </article>
@@ -80,56 +86,60 @@ export function renderRechargeManager({ container, recharges, setStatus, onSubmi
   `;
 
   let depositAddresses = {};
-  let selectedNetwork = null;
+  const form = container.querySelector('#recharge-form');
+  const submitBtn = container.querySelector('#recharge-submit-btn');
 
-  // Load deposit addresses from DB
-  apiClient.fetchDepositAddresses().then((rows) => {
-    rows.forEach((row) => { depositAddresses[row.network] = row.address; });
-  }).catch(() => {});
+  const setAddressText = (network, value) => {
+    const node = container.querySelector(`#deposit-address-${network}`);
+    if (node) {
+      node.textContent = value || 'Address not configured — contact support.';
+    }
+  };
 
-  const addressDisplay  = container.querySelector('#deposit-address-display');
-  const networkLabel    = container.querySelector('#deposit-network-label');
-  const addressText     = container.querySelector('#deposit-address-text');
-  const copyBtn         = container.querySelector('#copy-deposit-address');
-  const rechargeForm    = container.querySelector('#recharge-form');
-  const submitBtn       = container.querySelector('#recharge-submit-btn');
+  apiClient.fetchDepositAddresses()
+    .then((rows) => {
+      rows.forEach((row) => { depositAddresses[row.network] = row.address; });
+      setAddressText('erc20', depositAddresses.erc20);
+      setAddressText('trc20', depositAddresses.trc20);
+    })
+    .catch(() => {
+      setAddressText('erc20', '');
+      setAddressText('trc20', '');
+    });
 
-  container.querySelectorAll('input[name="recharge_network"]').forEach((radio) => {
-    radio.addEventListener('change', () => {
-      selectedNetwork = radio.value;
-      const address = depositAddresses[selectedNetwork];
-      networkLabel.textContent = NETWORK_LABELS[selectedNetwork] || selectedNetwork;
-      addressText.textContent  = address || 'Address not configured — contact support.';
-      addressDisplay.hidden    = false;
-      rechargeForm.hidden      = !address;
+  container.querySelectorAll('.copy-button[data-network]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const network = button.getAttribute('data-network');
+      const text = (network && depositAddresses[network]) ? depositAddresses[network].trim() : '';
+      if (!text) return;
+      try {
+        await navigator.clipboard.writeText(text);
+        button.textContent = 'COPIED!';
+        button.classList.add('copied');
+        setTimeout(() => {
+          button.textContent = 'COPY ADDRESS';
+          button.classList.remove('copied');
+        }, 2000);
+      } catch {
+        button.textContent = 'FAILED';
+        setTimeout(() => { button.textContent = 'COPY ADDRESS'; }, 2000);
+      }
     });
   });
 
-  copyBtn?.addEventListener('click', async () => {
-    const text = addressText?.textContent?.trim();
-    if (!text) return;
-    try {
-      await navigator.clipboard.writeText(text);
-      copyBtn.textContent = 'Copied!';
-      copyBtn.classList.add('copied');
-      setTimeout(() => { copyBtn.textContent = 'Copy'; copyBtn.classList.remove('copied'); }, 2000);
-    } catch {
-      copyBtn.textContent = 'Failed';
-      setTimeout(() => { copyBtn.textContent = 'Copy'; }, 2000);
-    }
-  });
-
-  rechargeForm?.addEventListener('submit', async (event) => {
+  form?.addEventListener('submit', async (event) => {
     event.preventDefault();
     const amount = Number(container.querySelector('#recharge-amount')?.value || 0);
+    const selectedNetwork = form.querySelector('input[name="recharge_network"]:checked')?.value;
+    const targetAddress = selectedNetwork ? depositAddresses[selectedNetwork] : '';
 
     if (!amount || amount <= 0) {
       setStatus('Enter a valid deposit amount.', 'warning');
       return;
     }
 
-    if (!selectedNetwork) {
-      setStatus('Select a network.', 'warning');
+    if (!selectedNetwork || !targetAddress) {
+      setStatus('Select a configured network address first.', 'warning');
       return;
     }
 
@@ -138,12 +148,8 @@ export function renderRechargeManager({ container, recharges, setStatus, onSubmi
 
     try {
       await apiClient.createRechargeRequest({ amount, network: selectedNetwork });
-      rechargeForm.reset();
-      addressDisplay.hidden = true;
-      rechargeForm.hidden   = true;
-      selectedNetwork = null;
-      container.querySelectorAll('input[name="recharge_network"]').forEach((r) => { r.checked = false; });
-      setStatus('Deposit request submitted. Our team will verify and credit your balance shortly.', 'success');
+      form.reset();
+      setStatus('Deposit request submitted. Share payment proof in the designated Telegram admin group. Balance is credited only after admin verification.', 'success');
       await onSubmitted?.();
     } catch (error) {
       setStatus(error.message || 'Unable to submit deposit request.', 'danger');

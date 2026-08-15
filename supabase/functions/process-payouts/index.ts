@@ -14,9 +14,17 @@ Deno.serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
+  if (req.method !== 'POST') {
+    return jsonResponse({ error: 'Method not allowed' }, 405);
+  }
+
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const serviceKey  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   const anonKey     = Deno.env.get('SUPABASE_ANON_KEY');
+
+  if (!supabaseUrl || !serviceKey || !anonKey) {
+    return jsonResponse({ error: 'Missing required server configuration' }, 500);
+  }
 
   const authClient = createClient(supabaseUrl, anonKey, {
     auth: { persistSession: false },
@@ -30,9 +38,7 @@ Deno.serve(async (req) => {
   try {
     const { data: { user }, error: userError } = await authClient.auth.getUser();
     if (userError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      return jsonResponse({ error: 'Unauthorized' }, 401);
     }
 
     const { data: profile } = await serviceClient
@@ -42,28 +48,27 @@ Deno.serve(async (req) => {
       .single();
 
     if (profile?.role !== 'admin') {
-      return new Response(JSON.stringify({ error: 'Forbidden' }), {
-        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      return jsonResponse({ error: 'Forbidden' }, 403);
     }
 
     const { data: result, error: rpcError } = await serviceClient.rpc('process_payouts');
 
     if (rpcError) {
       console.error('process_payouts RPC error:', rpcError);
-      return new Response(JSON.stringify({ error: rpcError.message }), {
-        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      return jsonResponse({ error: rpcError.message }, 500);
     }
 
-    return new Response(JSON.stringify(result), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
+    return jsonResponse(result ?? {});
 
   } catch (err) {
     console.error('process-payouts error:', err);
-    return new Response(JSON.stringify({ error: 'Internal server error' }), {
-      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
+    return jsonResponse({ error: 'Internal server error' }, 500);
   }
 });
+
+function jsonResponse(body: Record<string, unknown>, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+  });
+}

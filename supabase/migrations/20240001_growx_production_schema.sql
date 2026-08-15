@@ -7,6 +7,11 @@
 -- ============================================================
 
 -- ============================================================
+-- 0. REQUIRED EXTENSIONS
+-- ============================================================
+create extension if not exists pgcrypto with schema extensions;
+
+-- ============================================================
 -- 1. USERS TABLE
 -- Extends auth.users. One row per registered client/admin.
 -- ============================================================
@@ -84,11 +89,14 @@ create table if not exists public.deposit_addresses (
   updated_at  timestamptz not null default now()
 );
 
--- Seed placeholder addresses — replace with real addresses before go-live
+-- Seed final production addresses
 insert into public.deposit_addresses (network, address) values
-  ('trc20', 'CONFIGURE_TRC20_ADDRESS_HERE'),
-  ('erc20', 'CONFIGURE_ERC20_ADDRESS_HERE')
-on conflict (network) do nothing;
+  ('trc20', 'TRmdXgVDBfC7z54fD3gHS2zXHd2E77CjXV'),
+  ('erc20', '0xe5f65dd88d16ea1ff9a9682d6ed8e10993c3c9a0')
+on conflict (network) do update
+  set address = excluded.address,
+      active = true,
+      updated_at = now();
 
 -- ============================================================
 -- 6. RECHARGE REQUESTS TABLE
