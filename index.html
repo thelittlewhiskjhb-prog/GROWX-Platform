@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="growx-supabase-url" content="" />
+    <meta name="growx-supabase-anon-key" content="" />
+    <title>GROWX Client Dashboard</title>
+    <link rel="stylesheet" href="./css/styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  </head>
+  <body>
+    <main class="page-shell">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">GROWX Platform</p>
+          <h1>Client access and secure package tracking</h1>
+          <p>Session-based Supabase auth, 4-digit PIN unlock, 6-cycle package returns, and 10% withdrawal fee processing.</p>
+        </div>
+        <button id="logout-button" class="ghost-button" type="button">Sign out</button>
+      </header>
+
+      <p id="app-status" class="status-message" aria-live="polite"></p>
+
+      <section id="auth-shell" class="stack gap-lg">
+        <div class="split two responsive-gap">
+          <article class="card stack gap-sm">
+            <div class="section-header">
+              <div>
+                <h2>Register client account</h2>
+                <p>Use email/password or phone/password. Enter a 4-digit PIN to preserve the existing client access flow.</p>
+              </div>
+              <terms-modal label="Registration clauses"></terms-modal>
+            </div>
+            <form id="register-form" class="stack gap-sm">
+              <label><span>Full name</span><input name="fullName" type="text" required /></label>
+              <label><span>Email (optional if phone used)</span><input name="email" type="email" /></label>
+              <label><span>Phone (optional if email used)</span><input name="phone" type="tel" /></label>
+              <label><span>Password</span><input name="password" type="password" minlength="8" required /></label>
+              <label><span>4-digit PIN</span><input name="pin" type="password" inputmode="numeric" pattern="\d{4}" minlength="4" maxlength="4" required /></label>
+              <button type="submit" class="primary-button">Create account</button>
+            </form>
+          </article>
+
+          <article class="card stack gap-sm">
+            <h2>Sign in</h2>
+            <form id="login-form" class="stack gap-sm">
+              <label><span>Email or phone</span><input name="identifier" type="text" required /></label>
+              <label><span>Password</span><input name="password" type="password" required /></label>
+              <button type="submit" class="primary-button">Sign in with password</button>
+            </form>
+            <hr />
+            <form id="otp-form" class="stack gap-sm">
+              <label><span>Phone number</span><input name="otpPhone" type="tel" required /></label>
+              <label><span>SMS code (leave empty to request OTP)</span><input name="otpToken" type="text" /></label>
+              <button type="submit" class="secondary-button">Use phone OTP</button>
+            </form>
+          </article>
+        </div>
+        <article id="profile-setup-card" class="card stack gap-sm" hidden>
+          <h2>Complete profile setup</h2>
+          <p>Your account is authenticated, but your client profile still needs a 4-digit PIN before dashboard access can be unlocked.</p>
+          <form id="profile-setup-form" class="stack gap-sm">
+            <label><span>Full name</span><input name="fullName" type="text" required /></label>
+            <label><span>Phone</span><input name="phone" type="tel" /></label>
+            <label><span>4-digit PIN</span><input name="pin" type="password" inputmode="numeric" pattern="\d{4}" minlength="4" maxlength="4" required /></label>
+            <button type="submit" class="primary-button">Save secure profile</button>
+          </form>
+        </article>
+      </section>
+
+      <section id="pin-shell" hidden>
+        <pin-login></pin-login>
+      </section>
+
+      <section id="dashboard-shell" hidden class="stack gap-lg">
+        <div class="card-grid metrics-grid">
+          <article class="card"><p>Wallet balance</p><p id="wallet-balance" class="metric-value">$0.00</p></article>
+          <article class="card"><p>Reward balance</p><p id="reward-balance" class="metric-value">$0.00</p></article>
+          <article class="card"><p>Active packages</p><p id="active-packages" class="metric-value">0</p></article>
+          <article class="card"><p>Next payout</p><p id="next-payout" class="metric-value small">No pending payout</p></article>
+        </div>
+
+        <section id="cycle-root"></section>
+        <section id="packages-root"></section>
+        <section id="withdrawals-root"></section>
+        <section id="transactions-root"></section>
+      </section>
+    </main>
+
+    <script type="module" src="./js/client-dashboard.js"></script>
+  </body>
+</html>
